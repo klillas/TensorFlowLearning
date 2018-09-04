@@ -3,6 +3,7 @@ import numpy as np
 from six.moves import xrange
 from sklearn.preprocessing import StandardScaler
 
+# Change to test commit and push to GitHub
 class LinearRegression:
     x_input = 0
     y_input = 0
