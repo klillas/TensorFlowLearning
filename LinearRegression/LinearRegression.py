@@ -20,7 +20,7 @@ class LinearRegression:
     cost = 0
     train = 0
 
-    def initialize(self, x_input, y_input, iterations = 100000, learn_rate = 0.01, feature_scale = True):
+    def initialize(self, x_input, y_input, iterations = 1000000, learn_rate = 0.01, feature_scale = True):
         '''
         Initializes the linear regression algorithm
         :param x_input: The training input
@@ -30,10 +30,11 @@ class LinearRegression:
         :return: Nothing
         '''
 
+        x_max = np.amax(x_input, axis=0)
+        x_min = np.amin(x_input, axis=0)
+
         if feature_scale:
-            scaler = StandardScaler()
-            scaler.fit(x_input)
-            x_input = scaler.transform(x_input)
+            x_input = (x_input-x_min)/(x_max-x_min)
 
         self.x_input = x_input
         self.y_input = y_input

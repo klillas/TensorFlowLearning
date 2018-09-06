@@ -13,13 +13,14 @@ class IOHelper:
         Array of labels
         """
         csv_data = np.genfromtxt(file_path, delimiter=",", skip_header=1)
+        #csv_data = csv_data[0:1000]
         data = []
         labels = []
         # np.random.seed(12345)
         np.random.shuffle(csv_data)
 
         for d in csv_data:
-            data.append(d[1:-1])
+            data.append(d[0:-1])
             labels.append([d[-1]])
 
         return np.array(data), np.array(labels)
