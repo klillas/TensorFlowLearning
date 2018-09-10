@@ -2,82 +2,78 @@ import tensorflow as tf
 import numpy as np
 from six.moves import xrange
 
+from LogisticRegression.LogisticRegressionData import LogisticRegressionData
+
+
 class LogisticRegression:
-    x_input = 0
-    y_input = 0
+    data_train = None
 
-    polynomialDegree = 0
-    iterations = 0
-    learn_rate = 0
-    m = 0
-    params = 0
-    x = 0
-    W = [None]
-    b = 0
-    y = 0
-    model = 0
-    cost = 0
-    train = 0
-    prediction = 0
-    classifier = 0
-    correctness_percentage = 0
+    hyper_param_polynomialDegree = 0
+    hyper_param_iterations = 0
+    hyper_param_learn_rate = 0
+    data_train_m = 0
+    data_params = 0
+    tf_hold_x = 0
+    tf_var_W = [None]
+    tf_var_B = 0
+    tf_hold_y = 0
+    tf_tensor_model = 0
+    tf_tensor_cost = 0
+    tf_tensor_train = 0
+    tf_tensor_classifier = 0
+    tf_tensor_correctness_percentage = 0
 
 
-    def initialize(self, x_input, y_input, polynomialDegree = 3, iterations = 10000, learn_rate = 0.01, feature_scale = True, label_0_cost_modification = 1.0, label_1_cost_modification = 1.0):
-        '''
-        Initializes the linear regression algorithm
-        :param x_input: The training input
-        :param y_input: The training labels
-        :param iterations: The number of minimize iterations
-        :param learn_rate: The learning rate of the algorithm
-        :return: Nothing
-        '''
-        x_max = np.amax(x_input, axis=0)
-        x_min = np.amin(x_input, axis=0)
+    def initialize(
+            self,
+            data_train: LogisticRegressionData,
+            hyper_param_polynomialDegree = 3,
+            hyper_param_iterations = 10000,
+            hyper_param_learn_rate = 0.01,
+            feature_scale = True,
+            label_0_cost_modification = 1.0,
+            label_1_cost_modification = 1.0):
 
-        if feature_scale:
-            x_input = (x_input-x_min)/(x_max-x_min)
+        self.data_train = data_train
 
-        print("First x input params: ")
-        print(x_input[0])
-        # print("Max value of x: ", np.matrix.max(x_input))
-        # print("Min value of x: ", np.matrix.min(x_input))
+        print("First x input data_params: ")
+        print(self.data_train.data_x[0])
+        # print("Max value of x: ", np.matrix.max(self.data_train.data_x))
+        # print("Min value of x: ", np.matrix.min(self.data_train.data_x))
 
-        self.x_input = x_input
-        self.y_input = np.float32(y_input)
-        self.polynomialDegree = polynomialDegree
-        self.iterations = iterations
-        self.learn_rate = learn_rate
-        self.m = x_input.shape[0]
-        self.params = x_input.shape[1]
-        self.W = [None] * polynomialDegree
+        self.hyper_param_polynomialDegree = hyper_param_polynomialDegree
+        self.hyper_param_iterations = hyper_param_iterations
+        self.hyper_param_learn_rate = hyper_param_learn_rate
+        self.data_train_m = self.data_train.data_x.shape[0]
+        self.data_params = self.data_train.data_x.shape[1]
+        self.tf_var_W = [None] * hyper_param_polynomialDegree
 
-        self.x = tf.placeholder(tf.float32, [self.m, self.params], name="x")
-        self.y = tf.placeholder(tf.float32, [self.m, 1])
+        self.tf_hold_x = tf.placeholder(tf.float32, [self.data_train_m, self.data_params], name="x")
+        self.tf_hold_y = tf.placeholder(tf.float32, [self.data_train_m, 1])
 
-        self.W[0] = tf.Variable(((np.random.rand(self.params, 1)-0.5)*0.0001).astype(np.float32), name="W"+str(0))
-        self.model = tf.matmul(self.x, self.W[0])
-        for i in range(1, self.polynomialDegree):
-            self.W[i] = tf.Variable(((np.random.rand(self.params, 1)-0.5)*0.0001).astype(np.float32), name="W"+str(i))
-            self.model = tf.add(tf.matmul(tf.pow(self.x, i+1), self.W[i]), self.model)
+        self.tf_var_W[0] = tf.Variable(((np.random.rand(self.data_params, 1) - 0.5) * 0.0001).astype(np.float32), name="W" + str(0))
+        self.tf_tensor_model = tf.matmul(self.tf_hold_x, self.tf_var_W[0])
+        for i in range(1, self.hyper_param_polynomialDegree):
+            self.tf_var_W[i] = tf.Variable(((np.random.rand(self.data_params, 1) - 0.5) * 0.0001).astype(np.float32), name="W" + str(i))
+            self.tf_tensor_model = tf.add(tf.matmul(tf.pow(self.tf_hold_x, i + 1), self.tf_var_W[i]), self.tf_tensor_model)
 
-        self.b = tf.Variable(((np.random.rand(1)-0.5)*0.0001).astype(np.float32), name="b")
-        tf.summary.histogram("b", self.b)
-        self.model = tf.add(self.model, self.b)
+        self.tf_var_B = tf.Variable(((np.random.rand(1) - 0.5) * 0.0001).astype(np.float32), name="b")
+        tf.summary.histogram("b", self.tf_var_B)
+        self.tf_tensor_model = tf.add(self.tf_tensor_model, self.tf_var_B)
 
-        self.cost = tf.reduce_sum(
-            tf.multiply(tf.multiply(-self.y_input, tf.log(tf.sigmoid(self.model))), label_1_cost_modification)
-            -tf.multiply(tf.multiply((1-self.y_input), tf.log(1-tf.sigmoid(self.model))), label_0_cost_modification)) / self.m
-        tf.summary.scalar("Training cost", self.cost)
+        self.tf_tensor_cost = tf.reduce_sum(
+            tf.multiply(tf.multiply(-self.data_train.data_y, tf.log(tf.sigmoid(self.tf_tensor_model))), label_1_cost_modification)
+            -tf.multiply(tf.multiply((1-self.data_train.data_y), tf.log(1 - tf.sigmoid(self.tf_tensor_model))), label_0_cost_modification)) / self.data_train_m
+        tf.summary.scalar("Training cost", self.tf_tensor_cost)
 
-        self.classifier = tf.round(tf.sigmoid(self.model))
-        self.correctness_percentage = tf.reduce_sum(tf.cast(tf.equal(self.classifier, self.y), tf.float32)) / self.m
-        tf.summary.scalar("Correctness percentage", self.correctness_percentage)
+        self.tf_tensor_classifier = tf.round(tf.sigmoid(self.tf_tensor_model))
+        self.tf_tensor_correctness_percentage = tf.reduce_sum(tf.cast(tf.equal(self.tf_tensor_classifier, self.tf_hold_y), tf.float32)) / self.data_train_m
+        tf.summary.scalar("Correctness percentage", self.tf_tensor_correctness_percentage)
 
-        self.train = tf.train.GradientDescentOptimizer(learn_rate).minimize(self.cost)
+        self.tf_tensor_train = tf.train.GradientDescentOptimizer(hyper_param_learn_rate).minimize(self.tf_tensor_cost)
 
-        print("Number of label 0 in set: ", self.m - np.sum(self.y_input))
-        print("Number of label 1 in set: ", np.sum(self.y_input))
+        print("Number of label 0 in set: ", self.data_train_m - np.sum(self.data_train.data_y))
+        print("Number of label 1 in set: ", np.sum(self.data_train.data_y))
 
 
     def minimize(self):
@@ -93,34 +89,34 @@ class LogisticRegression:
             merged = tf.summary.merge_all()
             writer = tf.summary.FileWriter("logs", session.graph)
 
-            for i in xrange(self.iterations):
-                summary, result = session.run([merged, self.train], feed_dict={
-                    self.x: self.x_input,
-                    self.y: self.y_input
+            for i in xrange(self.hyper_param_iterations):
+                summary, result = session.run([merged, self.tf_tensor_train], feed_dict={
+                    self.tf_hold_x: self.data_train.data_x,
+                    self.tf_hold_y: self.data_train.data_y
                 })
 
-                print("Cost = {}".format(session.run(self.cost, feed_dict={
-                    self.x: self.x_input,
-                    self.y: self.y_input
+                print("Cost = {}".format(session.run(self.tf_tensor_cost, feed_dict={
+                    self.tf_hold_x: self.data_train.data_x,
+                    self.tf_hold_y: self.data_train.data_y
                 })))
 
-                print("Correctness percentage: ", session.run(self.correctness_percentage, feed_dict={
-                    self.x: self.x_input,
-                    self.y: self.y_input
+                print("Correctness percentage: ", session.run(self.tf_tensor_correctness_percentage, feed_dict={
+                    self.tf_hold_x: self.data_train.data_x,
+                    self.tf_hold_y: self.data_train.data_y
                 }))
 
                 writer.add_summary(summary, i)
 
-#               print("Incorrect label guesses: ", np.sum(np.abs(np.subtract(self.y_input, guess_labels))))
+#               print("Incorrect label guesses: ", np.sum(np.abs(np.subtract(self.data_train.data_y, guess_labels))))
 
-                predicted_labels = session.run(self.classifier, feed_dict={
-                    self.x: self.x_input,
-                    self.y: self.y_input
+                predicted_labels = session.run(self.tf_tensor_classifier, feed_dict={
+                    self.tf_hold_x: self.data_train.data_x,
+                    self.tf_hold_y: self.data_train.data_y
                 })
-                correct_guesses_count = session.run(tf.reduce_sum(tf.cast(tf.equal(predicted_labels, self.y_input), tf.float32)))
+                correct_guesses_count = session.run(tf.reduce_sum(tf.cast(tf.equal(predicted_labels, self.data_train.data_y), tf.float32)))
 
-                print("Correct guesses: ", correct_guesses_count, ". Incorrect guesses: ", self.m - correct_guesses_count)
-                print("Incorrect label 0 guesses: ", np.sum(np.multiply(1 - self.y_input, predicted_labels)))
-                print("Incorrect label 1 guesses: ", np.sum(np.multiply(self.y_input, 1 - predicted_labels)))
+                print("Correct guesses: ", correct_guesses_count, ". Incorrect guesses: ", self.data_train_m - correct_guesses_count)
+                print("Incorrect label 0 guesses: ", np.sum(np.multiply(1 - self.data_train.data_y, predicted_labels)))
+                print("Incorrect label 1 guesses: ", np.sum(np.multiply(self.data_train.data_y, 1 - predicted_labels)))
 
 

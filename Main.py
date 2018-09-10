@@ -1,6 +1,8 @@
 import os
 
 from LinearRegression.LinearRegression import LinearRegression
+from LogisticRegression.LogisticRegression import LogisticRegression
+from LogisticRegression.LogisticRegressionData import LogisticRegressionData
 from TensorFlowExamples.BasicOperations.BasicMatrixOperations import BasicMatrixOperations
 from TensorFlowExamples.BasicOperations.ConstantExample import ConstantExample
 from TensorFlowExamples.BasicOperations.MatrixReduction import MatrixReduction
@@ -50,8 +52,21 @@ io_helper = IOHelper()
 #knearestNeighbors = KNearestNeighbors()
 #knearestNeighbors.run_learning(os.path.abspath(os.path.join(os.path.dirname(__file__),'datasets','creditcard.csv')), k=3)
 
+#print("")
+#linear_regression = LinearRegression()
+#x_train, y_train, x_validate, y_validate = io_helper.loadCsvData(os.path.abspath(os.path.join(os.path.dirname(__file__),'datasets','creditcard.csv')))
+#linear_regression.initialize(x_train, y_train)
+#linear_regression.minimize()
+
 print("")
-linear_regression = LinearRegression()
-x_input, y_input = io_helper.loadCsvData(os.path.abspath(os.path.join(os.path.dirname(__file__),'datasets','creditcard.csv')))
-linear_regression.initialize(x_input, y_input)
-linear_regression.minimize()
+logistic_regression = LogisticRegression()
+x_train, y_train, x_validate, y_validate = io_helper.loadCsvData(os.path.abspath(os.path.join(os.path.dirname(__file__),'datasets','creditcard.csv')))
+logistic_regression.initialize(
+    LogisticRegressionData(x_train, y_train, feature_scale=True),
+    hyper_param_polynomialDegree=3,
+    hyper_param_iterations=100000,
+    hyper_param_learn_rate=0.01,
+    feature_scale=True,
+    label_0_cost_modification=1.0,
+    label_1_cost_modification=750)
+logistic_regression.minimize()
