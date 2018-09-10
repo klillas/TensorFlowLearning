@@ -18,4 +18,4 @@ class LogisticRegressionData:
         self.data_y = np.array(data_y, dtype=np.float32)
 
         if feature_scale:
-            self.data_train.data_x = (self.data_train.data_x-self.data_train.x_min)/(self.data_train.x_max-self.data_train.x_min)
+            self.data_x = (self.data_x-self.x_min)/(self.x_max-self.x_min)
