@@ -62,8 +62,8 @@ print("")
 logistic_regression = LogisticRegression()
 x_train, y_train, x_validate, y_validate = io_helper.loadCsvData(
     os.path.abspath(os.path.join(os.path.dirname(__file__),'datasets','creditcard.csv')),
-    trainPart=0.85,
-    validationPart=0.15)
+    trainPart=0.8,
+    validationPart=0.2)
 logisticRegressionDataTrain = LogisticRegressionData(x_train, y_train, feature_scale=True)
 logisticRegressionDataValidate = LogisticRegressionData(x_validate, y_validate)
 logisticRegressionDataValidate.OverrideMinMax(logisticRegressionDataTrain.x_min, logisticRegressionDataTrain.x_max)
@@ -71,9 +71,10 @@ logisticRegressionDataValidate.OverrideMinMax(logisticRegressionDataTrain.x_min,
 logistic_regression.initialize(
     logisticRegressionDataTrain,
     logisticRegressionDataValidate,
-    hyper_param_polynomialDegree=5,
+    hyper_param_polynomialDegree=10,
     hyper_param_iterations=100000,
-    hyper_param_learn_rate=0.01,
+    hyper_param_learn_rate=0.1,
+    hyper_param_lambda=1,
     feature_scale=True,
     label_0_cost_modification=1.0,
     label_1_cost_modification=750)
