@@ -15,10 +15,14 @@ class ConvNetMNistSolver:
     tf_tensor_model = None
     tf_tensor_cost = None
     tf_tensor_train = None
+    tf_tensor_predictor = None
 
     hyper_param_label_size = None
     hyper_param_picture_width = None
     hyper_param_picture_height = None
+    hyper_param_train_batch_size = None
+    hyper_param_shuffle = None
+    hyper_param_learn_rate = None
 
 
     def train_own_model(self):
@@ -27,40 +31,68 @@ class ConvNetMNistSolver:
         with tf.Session() as session:
             session.run(init)
 
-            for i in range(100):
+            for i in range(10000):
                 #####Train#####
+                if self.hyper_param_train_batch_size > 0:
+                    trainIds = np.random.randint(
+                        self.data_train.data_x.shape[0],
+                        size=self.hyper_param_train_batch_size)
+                else:
+                    trainIds = np.random.randint(
+                        self.data_train.data_x.shape[0],
+                        size=self.data_train.data_x.shape[0])
+
                 result = session.run(self.tf_tensor_train, feed_dict={
-                    self.tf_ph_x: self.data_train.data_x,
-                    self.tf_ph_label: self.data_train.labels
+                    self.tf_ph_x: self.data_train.data_x[trainIds, :],
+                    self.tf_ph_label: self.data_train.labels_one_hot[trainIds, :]
                 })
 
-                training_cost = session.run(self.tf_tensor_cost, feed_dict={
-                    self.tf_ph_x: self.data_train.data_x,
-                    self.tf_ph_label: self.data_train.labels
-                })
-                print("Train Cost = {}".format(training_cost))
+                if i % 100 == 0:
+                    print("Train step ", i, " finished")
+
+                if i % 100 == 0:
+                    training_cost = session.run(self.tf_tensor_cost, feed_dict={
+                        self.tf_ph_x: self.data_train.data_x,
+                        self.tf_ph_label: self.data_train.labels_one_hot
+                    })
+                    print("Train Cost = {}".format(training_cost))
+
+                    validation_cost = session.run(self.tf_tensor_cost, feed_dict={
+                        self.tf_ph_x: self.data_validate.data_x,
+                        self.tf_ph_label: self.data_validate.labels_one_hot
+                    })
+                    print("Validation Cost = {}".format(validation_cost))
+
+                    validation_prediction = session.run(self.tf_tensor_predictor, feed_dict={
+                        self.tf_ph_x: self.data_validate.data_x
+                    })
+
+                    validation_prediction_correct = np.sum(validation_prediction == self.data_validate.labels)
+                    # print(validation_prediction_correct, " of ", self.data_validate.labels.shape[0], " predictions correct. ", validation_prediction_correct / self.data_validate.labels.shape[0] * 100, "%")
+                    print("{:} of {:} predictions correct. {:.2f}%".format(validation_prediction_correct, self.data_validate.labels.shape[0], validation_prediction_correct / self.data_validate.labels.shape[0] * 100))
 
 
-    def initialize_own_model(self,
-                  data_train: CNNData):
-        #self.data_train = data_train
-
+    def initialize_own_model(self, data_train: CNNData):
         self.hyper_param_label_size = 10
         self.hyper_param_picture_height = 28
         self.hyper_param_picture_width = 28
+        self.hyper_param_train_batch_size = 500
+        self.hyper_param_shuffle = True
+        self.hyper_param_learn_rate = 0.01
 
         mnist = tf.contrib.learn.datasets.load_dataset("mnist")
+
         train_labels = np.asarray(mnist.train.labels, dtype=np.int32)
         train_data = mnist.train.images  # Returns np.array
         train_data = train_data.reshape((-1, self.hyper_param_picture_width, self.hyper_param_picture_height, 1))
-
         train_labels_one_hot = np.eye(self.hyper_param_label_size)[train_labels]
+        self.data_train = CNNData(train_data, train_labels, train_labels_one_hot)
 
-        self.data_train = CNNData(train_data, train_labels_one_hot)
-
-        eval_data = mnist.test.images  # Returns np.array
-        eval_data = eval_data.reshape((-1, self.hyper_param_picture_width, self.hyper_param_picture_height, 1))
-        eval_labels = np.asarray(mnist.test.labels, dtype=np.int32)
+        validation_labels = np.asarray(mnist.test.labels, dtype=np.int32)
+        validation_data = mnist.test.images  # Returns np.array
+        validation_data = validation_data.reshape((-1, self.hyper_param_picture_width, self.hyper_param_picture_height, 1))
+        validation_labels_one_hot = np.eye(self.hyper_param_label_size)[validation_labels]
+        self.data_validate = CNNData(validation_data, validation_labels, validation_labels_one_hot)
 
         # Black and white picture
         self.tf_ph_x = tf.placeholder(tf.float32, [None, self.hyper_param_picture_width, self.hyper_param_picture_height, 1])
@@ -68,6 +100,7 @@ class ConvNetMNistSolver:
         self._initialize_model()
         self._initialize_tensor_cost()
         self._initialize_train_optimizer()
+        self._initialize_predictor()
 
 
     def _initialize_model(self):
@@ -106,8 +139,10 @@ class ConvNetMNistSolver:
         self.tf_tensor_cost = tf.losses.mean_squared_error(labels=self.tf_ph_label, predictions=self.tf_tensor_model)
 
     def _initialize_train_optimizer(self):
-        hyper_param_learn_rate = 0.01
-        self.tf_tensor_train = tf.train.GradientDescentOptimizer(hyper_param_learn_rate).minimize(self.tf_tensor_cost)
+        self.tf_tensor_train = tf.train.GradientDescentOptimizer(self.hyper_param_learn_rate).minimize(self.tf_tensor_cost)
+
+    def _initialize_predictor(self):
+        self.tf_tensor_predictor = tf.argmax(input=self.tf_tensor_model, axis=1)
 
 
 
