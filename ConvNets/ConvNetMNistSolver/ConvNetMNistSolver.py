@@ -10,12 +10,16 @@ class ConvNetMNistSolver:
     data_validate = None
 
     tf_ph_x = None
-    tf_ph_label = None
+    tf_ph_label_one_hot = None
+    tf_ph_labels = None
 
     tf_tensor_model = None
     tf_tensor_cost = None
     tf_tensor_train = None
     tf_tensor_predictor = None
+
+    tf_scalar_summary_cost = None
+    tf_scalar_summary_correctness = None
 
     hyper_param_label_size = None
     hyper_param_picture_width = None
@@ -23,15 +27,20 @@ class ConvNetMNistSolver:
     hyper_param_train_batch_size = None
     hyper_param_shuffle = None
     hyper_param_learn_rate = None
+    hyper_param_model_name = None
 
 
     def train_own_model(self):
         init = tf.global_variables_initializer()
+        summary_merged = tf.summary.merge_all()
 
         with tf.Session() as session:
             session.run(init)
 
-            for i in range(10000):
+            writer_train = tf.summary.FileWriter("./logs/" + self.hyper_param_model_name + "/train", session.graph)
+            writer_validation = tf.summary.FileWriter("./logs/" + self.hyper_param_model_name + "/validation")
+
+            for i in range(1000000):
                 #####Train#####
                 if self.hyper_param_train_batch_size > 0:
                     trainIds = np.random.randint(
@@ -44,32 +53,39 @@ class ConvNetMNistSolver:
 
                 result = session.run(self.tf_tensor_train, feed_dict={
                     self.tf_ph_x: self.data_train.data_x[trainIds, :],
-                    self.tf_ph_label: self.data_train.labels_one_hot[trainIds, :]
+                    self.tf_ph_label_one_hot: self.data_train.labels_one_hot[trainIds, :]
                 })
 
                 if i % 100 == 0:
                     print("Train step ", i, " finished")
 
                 if i % 100 == 0:
-                    training_cost = session.run(self.tf_tensor_cost, feed_dict={
+                    summary, training_cost = session.run([summary_merged, self.tf_tensor_cost], feed_dict={
                         self.tf_ph_x: self.data_train.data_x,
-                        self.tf_ph_label: self.data_train.labels_one_hot
+                        self.tf_ph_label_one_hot: self.data_train.labels_one_hot
                     })
                     print("Train Cost = {}".format(training_cost))
+                    writer_train.add_summary(summary, i)
 
-                    validation_cost = session.run(self.tf_tensor_cost, feed_dict={
+                    summary, validation_cost = session.run([self.tf_scalar_summary_cost, self.tf_tensor_cost], feed_dict={
                         self.tf_ph_x: self.data_validate.data_x,
-                        self.tf_ph_label: self.data_validate.labels_one_hot
+                        self.tf_ph_label_one_hot: self.data_validate.labels_one_hot
                     })
                     print("Validation Cost = {}".format(validation_cost))
+                    writer_validation.add_summary(summary, i)
 
-                    validation_prediction = session.run(self.tf_tensor_predictor, feed_dict={
-                        self.tf_ph_x: self.data_validate.data_x
+                    summary, validation_prediction = session.run([self.tf_scalar_summary_correctness, self.tf_tensor_predictor], feed_dict={
+                        self.tf_ph_x: self.data_validate.data_x,
+                        self.tf_ph_labels: self.data_validate.labels
                     })
+                    writer_validation.add_summary(summary)
 
                     validation_prediction_correct = np.sum(validation_prediction == self.data_validate.labels)
                     # print(validation_prediction_correct, " of ", self.data_validate.labels.shape[0], " predictions correct. ", validation_prediction_correct / self.data_validate.labels.shape[0] * 100, "%")
                     print("{:} of {:} predictions correct. {:.2f}%".format(validation_prediction_correct, self.data_validate.labels.shape[0], validation_prediction_correct / self.data_validate.labels.shape[0] * 100))
+
+                    writer_train.flush()
+                    writer_validation.flush()
 
 
     def initialize_own_model(self, data_train: CNNData):
@@ -78,7 +94,8 @@ class ConvNetMNistSolver:
         self.hyper_param_picture_width = 28
         self.hyper_param_train_batch_size = 500
         self.hyper_param_shuffle = True
-        self.hyper_param_learn_rate = 0.01
+        self.hyper_param_learn_rate = 0.03
+        self.hyper_param_model_name = "MyModel06"
 
         mnist = tf.contrib.learn.datasets.load_dataset("mnist")
 
@@ -96,7 +113,8 @@ class ConvNetMNistSolver:
 
         # Black and white picture
         self.tf_ph_x = tf.placeholder(tf.float32, [None, self.hyper_param_picture_width, self.hyper_param_picture_height, 1])
-        self.tf_ph_label = tf.placeholder(tf.int32, [None, self.hyper_param_label_size])
+        self.tf_ph_label_one_hot = tf.placeholder(tf.int32, [None, self.hyper_param_label_size])
+        self.tf_ph_labels = tf.placeholder(tf.int32, [None, 1])
         self._initialize_model()
         self._initialize_tensor_cost()
         self._initialize_train_optimizer()
@@ -136,13 +154,15 @@ class ConvNetMNistSolver:
         self.tf_tensor_model = model
 
     def _initialize_tensor_cost(self):
-        self.tf_tensor_cost = tf.losses.mean_squared_error(labels=self.tf_ph_label, predictions=self.tf_tensor_model)
+        self.tf_tensor_cost = tf.losses.mean_squared_error(labels=self.tf_ph_label_one_hot, predictions=self.tf_tensor_model)
+        self.tf_scalar_summary_cost = tf.summary.scalar("Cost", self.tf_tensor_cost)
 
     def _initialize_train_optimizer(self):
         self.tf_tensor_train = tf.train.GradientDescentOptimizer(self.hyper_param_learn_rate).minimize(self.tf_tensor_cost)
 
     def _initialize_predictor(self):
-        self.tf_tensor_predictor = tf.argmax(input=self.tf_tensor_model, axis=1)
+        self.tf_tensor_predictor = tf.argmax(input=self.tf_tensor_model, axis=1, output_type=tf.int32)
+        self.tf_scalar_summary_correctness = tf.summary.scalar("Correctness %", tf.count_nonzero(tf.equal(self.tf_tensor_predictor, self.tf_ph_labels)))
 
 
 
