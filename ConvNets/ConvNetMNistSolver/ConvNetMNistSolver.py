@@ -1,6 +1,8 @@
 import numpy as np
 import tensorflow as tf
 from tensorflow import train
+from datetime import datetime
+from datetime import timedelta
 
 from ConvNets.ConvNetMNistSolver.CNNData import CNNData
 
@@ -17,17 +19,19 @@ class ConvNetMNistSolver:
     tf_tensor_cost = None
     tf_tensor_train = None
     tf_tensor_predictor = None
+    tf_tensor_global_step = None
+    tf_tensor_correctness = None
 
-    tf_scalar_summary_cost = None
-    tf_scalar_summary_correctness = None
+    tf_model_saver = None
 
     hyper_param_label_size = None
     hyper_param_picture_width = None
     hyper_param_picture_height = None
     hyper_param_train_batch_size = None
-    hyper_param_shuffle = None
     hyper_param_learn_rate = None
     hyper_param_model_name = None
+    hyper_param_load_existing_model = None
+    hyper_param_save_model_interval_seconds = None
 
 
     def train_own_model(self):
@@ -36,12 +40,19 @@ class ConvNetMNistSolver:
 
         with tf.Session() as session:
             session.run(init)
+            if self.hyper_param_load_existing_model:
+                self.tf_model_saver.restore(sess=session, save_path=tf.train.latest_checkpoint("./stored_models"))
+                #self.tf_model_saver.restore(sess=session, save_path="./stored_models/" + self.hyper_param_model_name + ".ckpt")
+
+            time_model_last_saved = datetime.now()
 
             writer_train = tf.summary.FileWriter("./logs/" + self.hyper_param_model_name + "/train", session.graph)
             writer_validation = tf.summary.FileWriter("./logs/" + self.hyper_param_model_name + "/validation")
 
-            for i in range(1000000):
+            for i in range(session.run(self.tf_tensor_global_step), 1000000):
+                #with tf.device("/gpu:0"):
                 #####Train#####
+                session.run(tf.assign(self.tf_tensor_global_step, i))
                 if self.hyper_param_train_batch_size > 0:
                     trainIds = np.random.randint(
                         self.data_train.data_x.shape[0],
@@ -60,72 +71,112 @@ class ConvNetMNistSolver:
                     print("Train step ", i, " finished")
 
                 if i % 100 == 0:
-                    summary, training_cost = session.run([summary_merged, self.tf_tensor_cost], feed_dict={
-                        self.tf_ph_x: self.data_train.data_x,
-                        self.tf_ph_label_one_hot: self.data_train.labels_one_hot
-                    })
-                    print("Train Cost = {}".format(training_cost))
-                    writer_train.add_summary(summary, i)
+                    self._calculcate_and_log_statistics(
+                        "Train cost",
+                        writer_train,
+                        session,
+                        self.data_train.data_x,
+                        self.data_train.labels,
+                        self.data_train.labels_one_hot
+                    )
 
-                    summary, validation_cost = session.run([self.tf_scalar_summary_cost, self.tf_tensor_cost], feed_dict={
-                        self.tf_ph_x: self.data_validate.data_x,
-                        self.tf_ph_label_one_hot: self.data_validate.labels_one_hot
-                    })
-                    print("Validation Cost = {}".format(validation_cost))
-                    writer_validation.add_summary(summary, i)
-
-                    summary, validation_prediction = session.run([self.tf_scalar_summary_correctness, self.tf_tensor_predictor], feed_dict={
-                        self.tf_ph_x: self.data_validate.data_x,
-                        self.tf_ph_labels: self.data_validate.labels
-                    })
-                    writer_validation.add_summary(summary)
-
-                    validation_prediction_correct = np.sum(validation_prediction == self.data_validate.labels)
-                    # print(validation_prediction_correct, " of ", self.data_validate.labels.shape[0], " predictions correct. ", validation_prediction_correct / self.data_validate.labels.shape[0] * 100, "%")
-                    print("{:} of {:} predictions correct. {:.2f}%".format(validation_prediction_correct, self.data_validate.labels.shape[0], validation_prediction_correct / self.data_validate.labels.shape[0] * 100))
+                    self._calculcate_and_log_statistics(
+                        "Validation cost",
+                        writer_validation,
+                        session,
+                        self.data_validate.data_x,
+                        self.data_validate.labels,
+                        self.data_validate.labels_one_hot
+                    )
 
                     writer_train.flush()
                     writer_validation.flush()
 
+                    if datetime.now() > (time_model_last_saved + timedelta(seconds=self.hyper_param_save_model_interval_seconds)):
+                        time_model_last_saved = datetime.now()
+                        self.tf_model_saver.save(sess=session, save_path="./stored_models/" + self.hyper_param_model_name + ".ckpt", global_step=tf.train.global_step(session, self.tf_tensor_global_step))
+                        print("Model state saved")
 
-    def initialize_own_model(self, data_train: CNNData):
-        self.hyper_param_label_size = 10
-        self.hyper_param_picture_height = 28
-        self.hyper_param_picture_width = 28
-        self.hyper_param_train_batch_size = 500
-        self.hyper_param_shuffle = True
-        self.hyper_param_learn_rate = 0.03
-        self.hyper_param_model_name = "MyModel06"
+    def _calculcate_and_log_statistics(self, cost_description, summary_writer, session, data_x, labels, labels_one_hot):
+        cost_batches = []
+        correctness_batches = []
+        for j in range(data_x.shape[0])[0::self.hyper_param_train_batch_size]:
+            training_cost_item, batch_correctness = session.run([self.tf_tensor_cost, self.tf_tensor_correctness], feed_dict={
+                self.tf_ph_x: data_x[j:j + 10],
+                self.tf_ph_label_one_hot: labels_one_hot[j:j + 10],
+                self.tf_ph_labels: labels[j:j + 10]
+            })
+            cost_batches.append(training_cost_item)
+            correctness_batches.append(batch_correctness)
 
-        mnist = tf.contrib.learn.datasets.load_dataset("mnist")
+        average_cost = np.mean(cost_batches)
+        average_correctness = np.mean(correctness_batches)
 
-        train_labels = np.asarray(mnist.train.labels, dtype=np.int32)
-        train_data = mnist.train.images  # Returns np.array
-        train_data = train_data.reshape((-1, self.hyper_param_picture_width, self.hyper_param_picture_height, 1))
-        train_labels_one_hot = np.eye(self.hyper_param_label_size)[train_labels]
-        self.data_train = CNNData(train_data, train_labels, train_labels_one_hot)
+        costs_summary = tf.Summary()
+        costs_summary.value.add(tag="Cost", simple_value=average_cost)
+        summary_writer.add_summary(costs_summary, tf.train.global_step(session, self.tf_tensor_global_step))
+        print("{} = {}".format(cost_description, average_cost))
 
-        validation_labels = np.asarray(mnist.test.labels, dtype=np.int32)
-        validation_data = mnist.test.images  # Returns np.array
-        validation_data = validation_data.reshape((-1, self.hyper_param_picture_width, self.hyper_param_picture_height, 1))
-        validation_labels_one_hot = np.eye(self.hyper_param_label_size)[validation_labels]
-        self.data_validate = CNNData(validation_data, validation_labels, validation_labels_one_hot)
+        correctness_summary = tf.Summary()
+        correctness_summary.value.add(tag="Correctness", simple_value=average_correctness)
+        summary_writer.add_summary(correctness_summary, tf.train.global_step(session, self.tf_tensor_global_step))
+        print("Correctness = {}".format(average_correctness))
 
-        # Black and white picture
-        self.tf_ph_x = tf.placeholder(tf.float32, [None, self.hyper_param_picture_width, self.hyper_param_picture_height, 1])
-        self.tf_ph_label_one_hot = tf.placeholder(tf.int32, [None, self.hyper_param_label_size])
-        self.tf_ph_labels = tf.placeholder(tf.int32, [None, 1])
+    def initialize_own_model(
+            self,
+            data_train: CNNData,
+            data_validate: CNNData,
+            hyper_param_label_size = 10,
+            hyper_param_picture_height = 28,
+            hyper_param_picture_width = 28,
+            hyper_param_train_batch_size = 500,
+            hyper_param_learn_rate = 0.03,
+            hyper_param_model_name = "ConvNetModel",
+            hyper_param_load_existing_model = False,
+            hyper_param_save_model_interval_seconds = 300
+    ):
+        self.data_train = data_train
+        self.data_validate = data_validate
+        self.hyper_param_label_size = hyper_param_label_size
+        self.hyper_param_picture_height = hyper_param_picture_height
+        self.hyper_param_picture_width = hyper_param_picture_width
+        self.hyper_param_train_batch_size = hyper_param_train_batch_size
+        self.hyper_param_learn_rate = hyper_param_learn_rate
+        self.hyper_param_model_name = hyper_param_model_name
+        self.hyper_param_load_existing_model = hyper_param_load_existing_model
+        self.hyper_param_save_model_interval_seconds = hyper_param_save_model_interval_seconds
+
+        self.tf_tensor_global_step = tf.Variable(0, trainable=False, name='global_step')
+        self.tf_ph_x = tf.placeholder(tf.float32, [None, self.hyper_param_picture_width, self.hyper_param_picture_height, 1], name='x')
+        self.tf_ph_label_one_hot = tf.placeholder(tf.int32, [None, self.hyper_param_label_size], name='labels_one_hot')
+        self.tf_ph_labels = tf.placeholder(tf.int32, [None], name='labels')
         self._initialize_model()
         self._initialize_tensor_cost()
         self._initialize_train_optimizer()
         self._initialize_predictor()
 
+        self.tf_model_saver = tf.train.Saver(max_to_keep=10, keep_checkpoint_every_n_hours=1)
+
 
     def _initialize_model(self):
         model = tf.layers.conv2d(
             inputs=self.tf_ph_x,
-            filters=4,
-            kernel_size=[3, 3],
+            filters=16,
+            kernel_size=[4, 4],
+            padding="same",
+            activation=tf.nn.relu
+        )
+
+        model = tf.layers.max_pooling2d(
+            inputs=model,
+            pool_size=[2, 2],
+            strides=2
+        )
+
+        model = tf.layers.conv2d(
+            inputs=self.tf_ph_x,
+            filters=32,
+            kernel_size=[4, 4],
             padding="same",
             activation=tf.nn.relu
         )
@@ -138,31 +189,36 @@ class ConvNetMNistSolver:
 
         model = tf.reshape(
             tensor=model,
-            shape=[-1, 14 * 14 * 4]
+            shape=[-1, 7 * 7 * 128]
         )
         model = tf.layers.dense(
             inputs=model,
-            units=1024
+            units=2048
+        )
+
+        model = tf.layers.dense(
+            inputs=model,
+            units=256
         )
 
         # Logits layer
         model = tf.layers.dense(
             inputs=model,
-            units=self.hyper_param_label_size
+            units=self.hyper_param_label_size,
+            name='model_logits_output'
         )
 
         self.tf_tensor_model = model
 
     def _initialize_tensor_cost(self):
         self.tf_tensor_cost = tf.losses.mean_squared_error(labels=self.tf_ph_label_one_hot, predictions=self.tf_tensor_model)
-        self.tf_scalar_summary_cost = tf.summary.scalar("Cost", self.tf_tensor_cost)
 
     def _initialize_train_optimizer(self):
         self.tf_tensor_train = tf.train.GradientDescentOptimizer(self.hyper_param_learn_rate).minimize(self.tf_tensor_cost)
 
     def _initialize_predictor(self):
         self.tf_tensor_predictor = tf.argmax(input=self.tf_tensor_model, axis=1, output_type=tf.int32)
-        self.tf_scalar_summary_correctness = tf.summary.scalar("Correctness %", tf.count_nonzero(tf.equal(self.tf_tensor_predictor, self.tf_ph_labels)))
+        self.tf_tensor_correctness = tf.count_nonzero(tf.equal(self.tf_tensor_predictor, self.tf_ph_labels)) / tf.cast(tf.shape(self.tf_ph_labels)[0], dtype=tf.int64)
 
 
 
