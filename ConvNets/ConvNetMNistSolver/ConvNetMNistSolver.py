@@ -71,6 +71,7 @@ class ConvNetMNistSolver:
                     print("Train step ", i, " finished")
 
                 if i % 100 == 0:
+                    print("Validation test")
                     self._calculcate_and_log_statistics(
                         "Train cost",
                         writer_train,
@@ -91,6 +92,10 @@ class ConvNetMNistSolver:
 
                     writer_train.flush()
                     writer_validation.flush()
+
+                    print("Validation test finished")
+                    print("")
+                    print("")
 
                     if datetime.now() > (time_model_last_saved + timedelta(seconds=self.hyper_param_save_model_interval_seconds)):
                         time_model_last_saved = datetime.now()
@@ -159,8 +164,14 @@ class ConvNetMNistSolver:
 
 
     def _initialize_model(self):
-        model = tf.layers.conv2d(
+        model = tf.layers.max_pooling2d(
             inputs=self.tf_ph_x,
+            pool_size=[10, 10],
+            strides=10
+        )
+
+        model = tf.layers.conv2d(
+            inputs=model,
             filters=16,
             kernel_size=[4, 4],
             padding="same",

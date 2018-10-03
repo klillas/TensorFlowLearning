@@ -1,22 +1,8 @@
-import os
 import numpy as np
-import tensorflow as tf
 
 from ConvNets.ConvNetMNistSolver.CNNData import CNNData
 from ConvNets.ConvNetMNistSolver.ConvNetMNistSolver import ConvNetMNistSolver
-from LinearRegression.LinearRegression import LinearRegression
-from LogisticRegression.LogisticRegression import LogisticRegression
-from LogisticRegression.LogisticRegressionData import LogisticRegressionData
-from TensorFlowExamples.BasicOperations.BasicMatrixOperations import BasicMatrixOperations
-from TensorFlowExamples.BasicOperations.ConstantExample import ConstantExample
-from TensorFlowExamples.BasicOperations.MatrixReduction import MatrixReduction
-from TensorFlowExamples.BasicOperations.NumpyToTensorConversion import NumpyToTensorConversion
-from TensorFlowExamples.BasicOperations.PlaceholderExample import PlaceholderExample
-from TensorFlowExamples.BasicOperations.SegmentationExample import SegmentationExample
-from TensorFlowExamples.BasicOperations.SequenceUtilitiesExamples import SequenceUtilitiesExamples
-from TensorFlowExamples.BasicOperations.TensorboardExample import TensorboardExample
-from TensorFlowExamples.KNearestNeighbors.KNearestNeighbors import KNearestNeighbors
-from datasets.IOHelper import IOHelper
+from ConvNets.SemanticSegmentation.SemanticSegmentationTrainingDataLoader import SemanticSegmentationTrainingDataLoader
 
 #constantExample = ConstantExample()
 #constantExample.run()
@@ -87,35 +73,49 @@ from datasets.IOHelper import IOHelper
 
 
 
+#print("")
+# Load training and eval data
+#hyper_param_label_size = 10
+#hyper_param_picture_height = 28
+#hyper_param_picture_width = 28
+
+#mnist = tf.contrib.learn.datasets.load_dataset("mnist")
+
+#train_labels = np.asarray(mnist.train.labels, dtype=np.int32)
+#train_data = mnist.train.images  # Returns np.array
+#train_data = train_data.reshape((-1, hyper_param_picture_width, hyper_param_picture_height, 1))
+#train_labels_one_hot = np.eye(hyper_param_label_size)[train_labels]
+#data_train = CNNData(train_data, train_labels, train_labels_one_hot)
+
+#validation_labels = np.asarray(mnist.test.labels, dtype=np.int32)
+#validation_data = mnist.test.images  # Returns np.array
+#validation_data = validation_data.reshape((-1, hyper_param_picture_width, hyper_param_picture_height, 1))
+#validation_labels_one_hot = np.eye(hyper_param_label_size)[validation_labels]
+#data_validate = CNNData(validation_data[0:7000], validation_labels[0:7000], validation_labels_one_hot[0:7000])
+
+#mnistSolver = ConvNetMNistSolver()
+#mnistSolver.initialize_own_model(
+#    hyper_param_model_name="MyModel30",
+#    data_train=data_train,
+#    data_validate=data_validate,
+#    hyper_param_label_size=hyper_param_label_size,
+#    hyper_param_picture_height=hyper_param_picture_height,
+#    hyper_param_picture_width=hyper_param_picture_width,
+#    hyper_param_load_existing_model=True,
+#    hyper_param_save_model_interval_seconds=300
+#)
+#mnistSolver.train_own_model()
+
+
+
+
+
+
+
+
 print("")
 # Load training and eval data
-hyper_param_label_size = 10
-hyper_param_picture_height = 28
-hyper_param_picture_width = 28
-
-mnist = tf.contrib.learn.datasets.load_dataset("mnist")
-
-train_labels = np.asarray(mnist.train.labels, dtype=np.int32)
-train_data = mnist.train.images  # Returns np.array
-train_data = train_data.reshape((-1, hyper_param_picture_width, hyper_param_picture_height, 1))
-train_labels_one_hot = np.eye(hyper_param_label_size)[train_labels]
-data_train = CNNData(train_data, train_labels, train_labels_one_hot)
-
-validation_labels = np.asarray(mnist.test.labels, dtype=np.int32)
-validation_data = mnist.test.images  # Returns np.array
-validation_data = validation_data.reshape((-1, hyper_param_picture_width, hyper_param_picture_height, 1))
-validation_labels_one_hot = np.eye(hyper_param_label_size)[validation_labels]
-data_validate = CNNData(validation_data[0:7000], validation_labels[0:7000], validation_labels_one_hot[0:7000])
-
-mnistSolver = ConvNetMNistSolver()
-mnistSolver.initialize_own_model(
-    hyper_param_model_name="MyModel30",
-    data_train=data_train,
-    data_validate=data_validate,
-    hyper_param_label_size=hyper_param_label_size,
-    hyper_param_picture_height=hyper_param_picture_height,
-    hyper_param_picture_width=hyper_param_picture_width,
-    hyper_param_load_existing_model=False,
-    hyper_param_save_model_interval_seconds=30
-)
-mnistSolver.train_own_model()
+print("Loading training data")
+training_data_generator = SemanticSegmentationTrainingDataLoader()
+training_data, labels, training_size, image_height, image_width, image_channels = training_data_generator.generate_traindata_from_depthvision_pictures()
+a = 5
