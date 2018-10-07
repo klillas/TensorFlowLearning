@@ -2,6 +2,7 @@ import numpy as np
 
 from ConvNets.ConvNetMNistSolver.CNNData import CNNData
 from ConvNets.ConvNetMNistSolver.ConvNetMNistSolver import ConvNetMNistSolver
+from ConvNets.SemanticSegmentation.SemanticSegmentation import SemanticSegmentation
 from ConvNets.SemanticSegmentation.SemanticSegmentationTrainingDataLoader import SemanticSegmentationTrainingDataLoader
 
 #constantExample = ConstantExample()
@@ -117,5 +118,7 @@ print("")
 # Load training and eval data
 print("Loading training data")
 training_data_generator = SemanticSegmentationTrainingDataLoader()
-training_data, labels, training_size, image_height, image_width, image_channels = training_data_generator.generate_traindata_from_depthvision_pictures()
-a = 5
+semantic_segmentation_data_train, semantic_segmentation_data_validation, image_height, image_width, image_channels = training_data_generator.generate_traindata_from_depthvision_pictures()
+semantic_segmentation = SemanticSegmentation()
+semantic_segmentation.initialize(semantic_segmentation_data_train, semantic_segmentation_data_validation, image_height, image_width, image_channels, 0.001, 5)
+semantic_segmentation.train_own_model()
