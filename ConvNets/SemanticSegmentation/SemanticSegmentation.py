@@ -88,32 +88,28 @@ class SemanticSegmentation:
                         "Train cost",
                         session,
                         writer_train,
-                        self.data_train.data_x,
-                        self.data_train.labels,
-                        self.data_train.labels_one_hot
+                        self.data_train
                     )
 
                     self._calculcate_and_log_statistics(
                         "Validation cost",
                         session,
                         writer_validation,
-                        self.data_validation.data_x,
-                        self.data_validation.labels,
-                        self.data_validation.labels_one_hot
+                        self.data_validation
                     )
 
                     writer_train.flush()
                     writer_validation.flush()
 
-    def _calculcate_and_log_statistics(self, cost_description, session, summary_writer, data_x, labels, labels_one_hot):
+    def _calculcate_and_log_statistics(self, cost_description, session, summary_writer, semantic_segmentation_data: SemanticSegmentationData):
         cost_batches = []
         correctness_batches = []
-        prediction_batches = np.zeros(labels.shape)
-        for j in range(data_x.shape[0])[0::self.hyper_param_train_batch_size]:
+        prediction_batches = np.zeros(semantic_segmentation_data.labels.shape)
+        for j in range(semantic_segmentation_data.data_x.shape[0])[0::self.hyper_param_train_batch_size]:
             training_cost_item, batch_correctness, batch_predictor = session.run([self.tf_tensor_cost, self.tf_tensor_correctness, self.tf_tensor_predictor], feed_dict={
-                self.tf_ph_x: data_x[j:j + self.hyper_param_train_batch_size],
-                self.tf_ph_labels_one_hot: labels_one_hot[j:j + self.hyper_param_train_batch_size],
-                self.tf_ph_labels: labels[j:j + self.hyper_param_train_batch_size],
+                self.tf_ph_x: semantic_segmentation_data.data_x[j:j + self.hyper_param_train_batch_size],
+                self.tf_ph_labels_one_hot: semantic_segmentation_data.labels_one_hot[j:j + self.hyper_param_train_batch_size],
+                self.tf_ph_labels: semantic_segmentation_data.labels[j:j + self.hyper_param_train_batch_size],
                 self.tf_ph_droput_keep_prob: 1.0
             })
             cost_batches.append(training_cost_item)
@@ -135,11 +131,13 @@ class SemanticSegmentation:
         print("Correctness = {}".format(average_correctness))
 
         total_label_1_correct_predictions = 0
-        for i in range(labels.shape[0]):
+        for i in range(semantic_segmentation_data.labels.shape[0]):
             if (np.where(prediction_batches[i] == 1)[0].shape[0] > 0):
-                total_label_1_correct_predictions = total_label_1_correct_predictions + np.where(np.take(labels, np.where(prediction_batches[0] == 1)[0]) == 1)[0].shape[0]
+                total_label_1_correct_predictions = total_label_1_correct_predictions + np.where(np.take(semantic_segmentation_data.labels, np.where(prediction_batches[0] == 1)[0]) == 1)[0].shape[0]
         print("Label 1 correct guess percentage {}".format(total_label_1_correct_predictions / np.where(prediction_batches == 1)[0].shape[0]))
         #print("Total percentage of correctly labelled pixels: {}".format(np.where(prediction_batches == labels)[0].shape[0] / (labels.shape[0] * labels.shape[1])))
+
+        semantic_segmentation_data.exportImage("c:/temp/picture.jpg", 0)
 
         print("")
         print("")
