@@ -17,6 +17,7 @@ class SemanticSegmentation:
     tf_tensor_model = None
     tf_tensor_train = None
     tf_tensor_correctness = None
+    tf_tensor_global_step = None
 
     hyper_param_width = None
     hyper_param_height = None
@@ -24,14 +25,16 @@ class SemanticSegmentation:
     hyper_param_label_size = None
     hyper_param_learning_rate = None
     hyper_param_train_batch_size = None
+    hyper_param_model_name = None
 
-    def initialize(self, data_train: SemanticSegmentationData, data_validation: SemanticSegmentationData, image_height, image_width, image_channels, learning_rate, batch_size):
+    def initialize(self, data_train: SemanticSegmentationData, data_validation: SemanticSegmentationData, image_height, image_width, image_channels, learning_rate, batch_size, hyper_param_model_name):
         self.hyper_param_width = image_width
         self.hyper_param_height = image_height
         self.hyper_param_image_channels = image_channels
         self.hyper_param_label_size = data_train.label_count
         self.hyper_param_learning_rate = learning_rate
         self.hyper_param_train_batch_size = batch_size
+        self.hyper_param_model_name = hyper_param_model_name
 
         self.data_train = data_train
         self.data_validation = data_validation
@@ -41,6 +44,8 @@ class SemanticSegmentation:
         self.tf_ph_labels_one_hot = tf.placeholder(tf.int32, [None, self.hyper_param_height * self.hyper_param_width, self.hyper_param_label_size], name="labels")
         self.tf_ph_droput_keep_prob = tf.placeholder(tf.float32)
 
+        self.tf_tensor_global_step = tf.Variable(0, trainable=False, name='global_step')
+
         self._initialize_model()
         self._initialize_cost()
         self._initialize_optimization()
@@ -48,12 +53,17 @@ class SemanticSegmentation:
 
     def train_own_model(self):
         init = tf.global_variables_initializer()
+        summary_merged = tf.summary.merge_all()
 
         with tf.Session() as session:
             session.run(init)
 
+            writer_train = tf.summary.FileWriter("./logs/" + self.hyper_param_model_name + "/train", session.graph)
+            writer_validation = tf.summary.FileWriter("./logs/" + self.hyper_param_model_name + "/validation")
+
             for i in range(0, 1000000):
                 #####Train#####
+                session.run(tf.assign(self.tf_tensor_global_step, i))
                 if self.hyper_param_train_batch_size > 0:
                     trainIds = np.random.randint(
                         self.data_train.data_x.shape[0],
@@ -69,7 +79,7 @@ class SemanticSegmentation:
                     self.tf_ph_droput_keep_prob: 0.5
                 })
 
-                if (i % 500 == 0):
+                if (i % 100 == 0):
                     print("")
                     print("")
                     print("#################################################################")
@@ -77,6 +87,7 @@ class SemanticSegmentation:
                     self._calculcate_and_log_statistics(
                         "Train cost",
                         session,
+                        writer_train,
                         self.data_train.data_x,
                         self.data_train.labels,
                         self.data_train.labels_one_hot
@@ -85,12 +96,16 @@ class SemanticSegmentation:
                     self._calculcate_and_log_statistics(
                         "Validation cost",
                         session,
+                        writer_validation,
                         self.data_validation.data_x,
                         self.data_validation.labels,
                         self.data_validation.labels_one_hot
                     )
 
-    def _calculcate_and_log_statistics(self, cost_description, session, data_x, labels, labels_one_hot):
+                    writer_train.flush()
+                    writer_validation.flush()
+
+    def _calculcate_and_log_statistics(self, cost_description, session, summary_writer, data_x, labels, labels_one_hot):
         cost_batches = []
         correctness_batches = []
         prediction_batches = np.zeros(labels.shape)
@@ -108,22 +123,23 @@ class SemanticSegmentation:
         average_cost = np.mean(cost_batches)
         average_correctness = np.mean(correctness_batches)
 
-        #costs_summary = tf.Summary()
-        #costs_summary.value.add(tag="Cost", simple_value=average_cost)
-        #summary_writer.add_summary(costs_summary, tf.train.global_step(session, self.tf_tensor_global_step))
+        costs_summary = tf.Summary()
+        costs_summary.value.add(tag="Cost", simple_value=average_cost)
+        summary_writer.add_summary(costs_summary, tf.train.global_step(session, self.tf_tensor_global_step))
         print("Statistics for {}".format(cost_description))
         print("Average cost = {}".format(average_cost))
 
-        #correctness_summary = tf.Summary()
-        #correctness_summary.value.add(tag="Correctness", simple_value=average_correctness)
-        #summary_writer.add_summary(correctness_summary, tf.train.global_step(session, self.tf_tensor_global_step))
+        correctness_summary = tf.Summary()
+        correctness_summary.value.add(tag="Correctness", simple_value=average_correctness)
+        summary_writer.add_summary(correctness_summary, tf.train.global_step(session, self.tf_tensor_global_step))
         print("Correctness = {}".format(average_correctness))
 
-        if (np.where(prediction_batches[0] == 1)[0].shape[0] == 0):
-            print("Label 1 correct guess percentage 0")
-        else:
-            print("Label 1 correct guess percentage {}".format(np.where(np.take(labels, np.where(prediction_batches[0] == 1)[0]) == 1)[0].shape[0] / np.where(prediction_batches[0] == 1)[0].shape[0]))
-        print("Total percentage of correctly labelled pixels: {}".format(np.where(prediction_batches == labels)[0].shape[0] / (labels.shape[0] * labels.shape[1])))
+        total_label_1_correct_predictions = 0
+        for i in range(labels.shape[0]):
+            if (np.where(prediction_batches[i] == 1)[0].shape[0] > 0):
+                total_label_1_correct_predictions = total_label_1_correct_predictions + np.where(np.take(labels, np.where(prediction_batches[0] == 1)[0]) == 1)[0].shape[0]
+        print("Label 1 correct guess percentage {}".format(total_label_1_correct_predictions / np.where(prediction_batches == 1)[0].shape[0]))
+        #print("Total percentage of correctly labelled pixels: {}".format(np.where(prediction_batches == labels)[0].shape[0] / (labels.shape[0] * labels.shape[1])))
 
         print("")
         print("")
