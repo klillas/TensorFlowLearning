@@ -12,12 +12,17 @@ class SemanticSegmentation:
     tf_ph_labels = None
     tf_ph_labels_one_hot = None
     tf_ph_droput_keep_prob = None
+    tf_ph_image = None
 
     tf_tensor_cost = None
     tf_tensor_model = None
     tf_tensor_train = None
     tf_tensor_correctness = None
-    tf_tensor_global_step = None
+
+    tf_variable_global_step = None
+    tf_variable_image = None
+
+    tf_summary_image_predictions = None
 
     hyper_param_width = None
     hyper_param_height = None
@@ -43,8 +48,12 @@ class SemanticSegmentation:
         self.tf_ph_labels = tf.placeholder(tf.int32, [None, self.hyper_param_height * self.hyper_param_width], name="labels")
         self.tf_ph_labels_one_hot = tf.placeholder(tf.int32, [None, self.hyper_param_height * self.hyper_param_width, self.hyper_param_label_size], name="labels")
         self.tf_ph_droput_keep_prob = tf.placeholder(tf.float32)
+        self.tf_ph_image = tf.placeholder(tf.float32, (self.hyper_param_height, self.hyper_param_width, self.hyper_param_image_channels))
 
-        self.tf_tensor_global_step = tf.Variable(0, trainable=False, name='global_step')
+        self.tf_variable_global_step = tf.Variable(0, trainable=False, name='global_step')
+
+        self.tf_variable_image = tf.Variable(np.zeros((15, self.hyper_param_height, self.hyper_param_width, self.hyper_param_image_channels)))
+        self.tf_summary_image_predictions = tf.summary.image("example prediction", self.tf_variable_image, 15)
 
         self._initialize_model()
         self._initialize_cost()
@@ -57,13 +66,14 @@ class SemanticSegmentation:
 
         with tf.Session() as session:
             session.run(init)
+            session.graph.finalize()
 
             writer_train = tf.summary.FileWriter("./logs/" + self.hyper_param_model_name + "/train", session.graph)
             writer_validation = tf.summary.FileWriter("./logs/" + self.hyper_param_model_name + "/validation")
 
             for i in range(0, 1000000):
                 #####Train#####
-                session.run(tf.assign(self.tf_tensor_global_step, i))
+                self.tf_variable_global_step.load(i, session)
                 if self.hyper_param_train_batch_size > 0:
                     trainIds = np.random.randint(
                         self.data_train.data_x.shape[0],
@@ -79,7 +89,7 @@ class SemanticSegmentation:
                     self.tf_ph_droput_keep_prob: 0.5
                 })
 
-                if (i % 100 == 0):
+                if (i % 50 == 0):
                     print("")
                     print("")
                     print("#################################################################")
@@ -88,20 +98,22 @@ class SemanticSegmentation:
                         "Train cost",
                         session,
                         writer_train,
-                        self.data_train
+                        self.data_train,
+                        plotPrediction = False
                     )
 
                     self._calculcate_and_log_statistics(
                         "Validation cost",
                         session,
                         writer_validation,
-                        self.data_validation
+                        self.data_validation,
+                        plotPrediction = True
                     )
 
                     writer_train.flush()
                     writer_validation.flush()
 
-    def _calculcate_and_log_statistics(self, cost_description, session, summary_writer, semantic_segmentation_data: SemanticSegmentationData):
+    def _calculcate_and_log_statistics(self, cost_description, session, summary_writer, semantic_segmentation_data: SemanticSegmentationData, plotPrediction):
         cost_batches = []
         correctness_batches = []
         prediction_batches = np.zeros(semantic_segmentation_data.labels.shape)
@@ -121,23 +133,38 @@ class SemanticSegmentation:
 
         costs_summary = tf.Summary()
         costs_summary.value.add(tag="Cost", simple_value=average_cost)
-        summary_writer.add_summary(costs_summary, tf.train.global_step(session, self.tf_tensor_global_step))
+        summary_writer.add_summary(costs_summary, tf.train.global_step(session, self.tf_variable_global_step))
         print("Statistics for {}".format(cost_description))
         print("Average cost = {}".format(average_cost))
 
         correctness_summary = tf.Summary()
         correctness_summary.value.add(tag="Correctness", simple_value=average_correctness)
-        summary_writer.add_summary(correctness_summary, tf.train.global_step(session, self.tf_tensor_global_step))
+        summary_writer.add_summary(correctness_summary, tf.train.global_step(session, self.tf_variable_global_step))
         print("Correctness = {}".format(average_correctness))
 
         total_label_1_correct_predictions = 0
         for i in range(semantic_segmentation_data.labels.shape[0]):
             if (np.where(prediction_batches[i] == 1)[0].shape[0] > 0):
                 total_label_1_correct_predictions = total_label_1_correct_predictions + np.where(np.take(semantic_segmentation_data.labels, np.where(prediction_batches[0] == 1)[0]) == 1)[0].shape[0]
-        print("Label 1 correct guess percentage {}".format(total_label_1_correct_predictions / np.where(prediction_batches == 1)[0].shape[0]))
+        if np.where(prediction_batches == 1)[0].shape[0] == 0:
+            print("Label 1 correct guess percentage 0")
+        else:
+            print("Label 1 correct guess percentage {}".format(total_label_1_correct_predictions / np.where(prediction_batches == 1)[0].shape[0]))
         #print("Total percentage of correctly labelled pixels: {}".format(np.where(prediction_batches == labels)[0].shape[0] / (labels.shape[0] * labels.shape[1])))
 
-        semantic_segmentation_data.exportImage("c:/temp/picture.jpg", 0)
+        #semantic_segmentation_data.exportImage("c:/temp/picture.jpg", 0, prediction_batches[0])
+
+
+        if plotPrediction == True:
+            overlay_image = np.zeros((15, self.hyper_param_height, self.hyper_param_width, self.hyper_param_image_channels))
+            for i in range(15):
+                overlay_image[i] = semantic_segmentation_data.overlay_image_with_labels(i, np.reshape(prediction_batches[i], (self.hyper_param_height, self.hyper_param_width)))
+            self.tf_variable_image.load(overlay_image, session)
+
+            image_summary = session.run(self.tf_summary_image_predictions)
+            summary_writer.add_summary(image_summary, tf.train.global_step(session, self.tf_variable_global_step))
+
+            print("")
 
         print("")
         print("")
@@ -224,7 +251,7 @@ class SemanticSegmentation:
             model,
             filters=self.hyper_param_label_size,
             kernel_size=16,
-            strides=(32, 32),
+            strides=(8, 8),
             padding='SAME')
 
         model = tf.reshape(

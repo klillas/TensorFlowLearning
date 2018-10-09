@@ -10,7 +10,7 @@ public class GenerateTrainingData : MonoBehaviour {
 
 	// Use this for initialization
 	void Start () {
-      int examplesToCreate = 50;
+      int examplesToCreate = 500;
       var rand = new System.Random();
       var prefab = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
       // prefab.AddComponent<MeshCollider>();
@@ -19,8 +19,14 @@ public class GenerateTrainingData : MonoBehaviour {
       var startTime = DateTime.Now;
       for (int i = 0; i < examplesToCreate; i++)
       {
-         float zPos = (float)(rand.NextDouble() * 100.0);
-         prefab.transform.position = new Vector3(0, 1, zPos);
+         float zPos = (float)(rand.NextDouble() * 30);
+         float xPos = (float)(rand.NextDouble() * Camera.allCameras[0].pixelWidth);
+         float yPos = (float)(rand.NextDouble() * Camera.allCameras[0].pixelHeight);
+         var screenPoint = new Vector3(xPos, yPos, zPos);
+         var worldPos = Camera.allCameras[0].ScreenToWorldPoint(screenPoint);
+         prefab.transform.position = worldPos;
+         //prefab.transform.position = Camera.allCameras[0].transform.position + Camera.allCameras[0].transform.forward * zPos;
+         //prefab.transform.position = new Vector3(xPos, yPos, zPos);
 
          foreach (var camera in Camera.allCameras)
          {
