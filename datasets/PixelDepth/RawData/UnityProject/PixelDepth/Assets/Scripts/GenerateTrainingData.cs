@@ -5,42 +5,71 @@ using UnityEngine;
 
 public class GenerateTrainingData : MonoBehaviour {
    string trainingFolderLocation = "c:/temp/training/";
-
    List<GameObject> visibleItems = new List<GameObject>();
+   GameObject labelledItem;
+   System.Random rand = new System.Random();
 
-	// Use this for initialization
-	void Start () {
-      int examplesToCreate = 500;
-      var rand = new System.Random();
-      var prefab = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-      // prefab.AddComponent<MeshCollider>();
-      visibleItems.Add(prefab);
+   // Use this for initialization
+   void Start () {
+      int examplesToCreate = 5000;
+      labelledItem = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+      visibleItems.Add(labelledItem);
+
+      for (int i = 0; i < 10; i++)
+      {
+         var otherObject = GameObject.CreatePrimitive(PrimitiveType.Quad);
+         visibleItems.Add(otherObject);
+      }
 
       var startTime = DateTime.Now;
       for (int i = 0; i < examplesToCreate; i++)
       {
-         float zPos = (float)(rand.NextDouble() * 30);
-         float xPos = (float)(rand.NextDouble() * Camera.allCameras[0].pixelWidth);
-         float yPos = (float)(rand.NextDouble() * Camera.allCameras[0].pixelHeight);
-         var screenPoint = new Vector3(xPos, yPos, zPos);
-         var worldPos = Camera.allCameras[0].ScreenToWorldPoint(screenPoint);
-         prefab.transform.position = worldPos;
-         //prefab.transform.position = Camera.allCameras[0].transform.position + Camera.allCameras[0].transform.forward * zPos;
-         //prefab.transform.position = new Vector3(xPos, yPos, zPos);
+         foreach (var gameObject in visibleItems)
+         {
+            RandomlyPlaceObjectInCameraView(Camera.allCameras[0], gameObject);
+         }
 
          foreach (var camera in Camera.allCameras)
          {
             TakeScreenshot(camera, i);
          }
 
-         GenerateSemanticSegmentationTable(i);
+         if (GenerateSemanticSegmentationTable(i) == false)
+         {
+            // Not enough labelled hits in picture. Discard it.
+            var filesToDelete = Directory.GetFiles(trainingFolderLocation, "*" + i + "*");
+            if (filesToDelete.Length != 3)
+            {
+               throw new NotImplementedException("Training data generator found the wrong amount of files to delete");
+            }
+            foreach (var fileToDelete in filesToDelete)
+            {
+               File.Delete(fileToDelete);
+               i = i - 1;
+            }
+         }
       }
       var endTime = DateTime.Now;
       var timespan = endTime - startTime;
       print("Time per example: " + timespan.Milliseconds / examplesToCreate + "ms");
    }
 
-   private void GenerateSemanticSegmentationTable(int id)
+   void DeleteExampleWithId(int id)
+   {
+
+   }
+
+   void RandomlyPlaceObjectInCameraView(Camera camera, GameObject gameObject)
+   {
+      float zPos = (float)(rand.NextDouble() * 30);
+      float xPos = (float)(rand.NextDouble() * camera.pixelWidth);
+      float yPos = (float)(rand.NextDouble() * camera.pixelHeight);
+      var screenPoint = new Vector3(xPos, yPos, zPos + 1);
+      var worldPos = camera.ScreenToWorldPoint(screenPoint);
+      gameObject.transform.position = worldPos;
+   }
+
+   private bool GenerateSemanticSegmentationTable(int id)
    {
       // Generate semantic segmentation table
       int width = Camera.allCameras[0].pixelWidth;
@@ -50,21 +79,22 @@ public class GenerateTrainingData : MonoBehaviour {
       byte label1 = Convert.ToByte('1');
       byte deliminator = Convert.ToByte(' ');
       int arrPos = 0;
-      for (int row = 0; row < height; row++)
+      int pixelsLabeled = 0;
+      for (int row = height-1; row >= 0; row--)
       {
          for (int column = 0; column < width; column++)
          {
             Ray ray = Camera.allCameras[0].ScreenPointToRay(new Vector3(column, row, 0));
             RaycastHit hit;
             Physics.Raycast(ray, out hit);
-            if (hit.collider == null)
+            if (hit.collider != null && hit.collider.gameObject == labelledItem)
             {
-               semanticSegmentationTable[arrPos] = 0;
+               semanticSegmentationTable[arrPos] = 1;
             }
             else
             {
-               // TODO: Add type information, but for now go with static 1
-               semanticSegmentationTable[arrPos] = 1;
+               pixelsLabeled++;
+               semanticSegmentationTable[arrPos] = 0;
             }
             // semanticSegmentationTable[arrPos + 1] = deliminator;
             arrPos += 1;
@@ -72,13 +102,18 @@ public class GenerateTrainingData : MonoBehaviour {
       }
 
       File.WriteAllBytes(trainingFolderLocation + "/" + id + "_labels.dat", semanticSegmentationTable);
+      if (pixelsLabeled > 100)
+      {
+         return true;
+      }
+      return false;
    }
 
    private void TakeScreenshot(Camera camera, int id)
    {
       var width = camera.pixelWidth;
       var height = camera.pixelHeight;
-      var filename = string.Format("c:/temp/training/" + id + "_" + camera.name + ".jpg");
+      var filename = string.Format(trainingFolderLocation + id + "_" + camera.name + ".jpg");
 
       RenderTexture rt = new RenderTexture(width, height, 24);
       RenderTexture.active = rt;

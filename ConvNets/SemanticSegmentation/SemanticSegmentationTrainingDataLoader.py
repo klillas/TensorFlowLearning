@@ -8,7 +8,7 @@ class SemanticSegmentationTrainingDataLoader:
 
     def generate_traindata_from_depthvision_pictures(self):
         trainingDataPath = "C:/temp/training/"
-        data_set_size = 500
+        data_set_size = 5000
         image_width = 256
         image_height = 192
         image_channels = 3
