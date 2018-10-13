@@ -6,20 +6,30 @@ using UnityEngine;
 public class GenerateTrainingData : MonoBehaviour {
    string trainingFolderLocation = "c:/temp/training/";
    List<GameObject> visibleItems = new List<GameObject>();
-   GameObject labelledItem;
+   List<GameObject> labelledItems;
    System.Random rand = new System.Random();
 
    // Use this for initialization
    void Start () {
-      int examplesToCreate = 5000;
-      labelledItem = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-      visibleItems.Add(labelledItem);
+      int examplesToCreate = 500;
+      labelledItems = new List<GameObject>();
+      for (int i = 0; i < 30; i++)
+      {
+         var labelledItem = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+         var collider = labelledItem.GetComponent<Collider>();
+         Destroy(collider);
+         labelledItem.AddComponent<MeshCollider>();
+         labelledItems.Add(labelledItem);
+         visibleItems.Add(labelledItem);
+      }
 
+      /*
       for (int i = 0; i < 10; i++)
       {
          var otherObject = GameObject.CreatePrimitive(PrimitiveType.Quad);
          visibleItems.Add(otherObject);
       }
+      */
 
       var startTime = DateTime.Now;
       for (int i = 0; i < examplesToCreate; i++)
@@ -61,10 +71,10 @@ public class GenerateTrainingData : MonoBehaviour {
 
    void RandomlyPlaceObjectInCameraView(Camera camera, GameObject gameObject)
    {
-      float zPos = (float)(rand.NextDouble() * 30);
+      float zPos = (float)(rand.NextDouble() * 10);
       float xPos = (float)(rand.NextDouble() * camera.pixelWidth);
       float yPos = (float)(rand.NextDouble() * camera.pixelHeight);
-      var screenPoint = new Vector3(xPos, yPos, zPos + 1);
+      var screenPoint = new Vector3(xPos, yPos, zPos + 5);
       var worldPos = camera.ScreenToWorldPoint(screenPoint);
       gameObject.transform.position = worldPos;
    }
@@ -80,14 +90,14 @@ public class GenerateTrainingData : MonoBehaviour {
       byte deliminator = Convert.ToByte(' ');
       int arrPos = 0;
       int pixelsLabeled = 0;
-      for (int row = height-1; row >= 0; row--)
+      for (int row = height - 1; row >= 0; row--)
       {
          for (int column = 0; column < width; column++)
          {
             Ray ray = Camera.allCameras[0].ScreenPointToRay(new Vector3(column, row, 0));
             RaycastHit hit;
             Physics.Raycast(ray, out hit);
-            if (hit.collider != null && hit.collider.gameObject == labelledItem)
+            if (hit.collider != null && labelledItems.Contains(hit.collider.gameObject))
             {
                semanticSegmentationTable[arrPos] = 1;
             }

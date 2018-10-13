@@ -126,9 +126,10 @@ semantic_segmentation.initialize(
     image_height,
     image_width,
     image_channels,
-    0.001,
-    batch_size=10,
-    hyper_param_model_name="Model17",
-    load_existing_model=False,
-    save_model_interval_seconds=300)
+    0.00003,
+    batch_size=50,
+    hyper_param_model_name="Model46",
+    load_existing_model=True,
+    save_model_interval_seconds=120,
+    dropout_keep_prob=0.40)
 semantic_segmentation.train_own_model()
