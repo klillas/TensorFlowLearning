@@ -116,6 +116,9 @@ class SemanticSegmentation:
         writer_train = tf.summary.FileWriter("./logs/" + self.hyper_param_model_name + "/train", self.session.graph)
         writer_validation = tf.summary.FileWriter("./logs/" + self.hyper_param_model_name + "/validation")
 
+        batch_training_cost_buffer = np.zeros(((int) (self.data_train.data_x.shape[0] / self.hyper_param_train_batch_size)))
+        first_iteration = True
+
         for i in range(self.session.run(self.tf_variable_global_step), 1000000):
             print("Training step {}".format(i))
             self.tf_variable_global_step.load(i, session=self.session)
@@ -129,20 +132,32 @@ class SemanticSegmentation:
                     self.data_train.data_x.shape[0],
                     size=self.data_train.data_x.shape[0])
 
-            result = self.session.run(self.tf_tensor_train, feed_dict={
+            _, batch_training_cost = self.session.run([self.tf_tensor_train, self.tf_tensor_cost], feed_dict={
                 self.tf_ph_x: self.data_train.data_x[trainIds, :],
                 self.tf_ph_labels_one_hot: self.data_train.labels_one_hot[trainIds, :],
                 self.tf_ph_droput_keep_prob: self.hyper_param_dropout_keep_prob
             })
 
+            if first_iteration == True:
+                # TODO: This is a temporary solution until we can store the actual cost in a tensor and restore it
+                batch_training_cost_buffer.fill(batch_training_cost)
+            np.roll(batch_training_cost_buffer, 1)
+            batch_training_cost_buffer[0] = batch_training_cost
+            mean_training_cost = np.mean(batch_training_cost_buffer)
+
+            costs_summary = tf.Summary()
+            costs_summary.value.add(tag="Cost", simple_value=mean_training_cost)
+            writer_train.add_summary(costs_summary, tf.train.global_step(self.session, self.tf_variable_global_step))
+
             if (i % 5 == 0):
                 print("")
                 print("")
                 print("#################################################################")
+                print("Train batch cost: {}".format(mean_training_cost))
+                print("")
                 print("Validation test")
                 self._calculcate_and_log_statistics(
                     "Validation cost",
-                    self.session,
                     writer_validation,
                     self.data_validation,
                     plotPrediction = True,
@@ -151,17 +166,16 @@ class SemanticSegmentation:
 
                 writer_validation.flush()
 
-            if (i % 5 == 0):
-                self._calculcate_and_log_statistics(
-                    "Train cost",
-                    self.session,
-                    writer_train,
-                    # TODO: Use only a static subset of the total trainset now. Fix an incremental train calculation to get rid of this limitation.
-                    self.data_train[0:100],
-                    plotPrediction = False,
-                    calculate_cost = True
-                )
-                writer_train.flush()
+            #if (i % 5 == 0):
+            #    self._calculcate_and_log_statistics(
+            #        "Train cost",
+            #        writer_train,
+            #        # TODO: Use only a static subset of the total trainset now. Fix an incremental train calculation to get rid of this limitation.
+            #        self.data_train,
+            #        plotPrediction = False,
+            #        calculate_cost = True
+            #    )
+            #    writer_train.flush()
 
             if datetime.now() > (time_model_last_saved + timedelta(seconds=self.hyper_param_save_model_interval_seconds)):
                 time_model_last_saved = datetime.now()
@@ -171,13 +185,16 @@ class SemanticSegmentation:
                     global_step=tf.train.global_step(self.session, self.tf_variable_global_step))
                 print("Model state saved")
 
-    def _calculcate_and_log_statistics(self, cost_description, session, summary_writer, semantic_segmentation_data: SemanticSegmentationData, plotPrediction, calculate_cost):
+            first_iteration = False
+
+    def _calculcate_and_log_statistics(self, cost_description, summary_writer, semantic_segmentation_data: SemanticSegmentationData, plotPrediction, calculate_cost):
         if calculate_cost == True:
             prediction_batches = np.zeros(semantic_segmentation_data.labels.shape)
+            #cost_batches = np.zeros(semantic_segmentation_data.data_x.shape[0])
             cost_batches = []
             for j in range(semantic_segmentation_data.data_x.shape[0])[0::self.hyper_param_train_batch_size]:
                 # print("Calculating cost of example {}".format(j))
-                training_cost_item, batch_predictor = session.run([self.tf_tensor_cost, self.tf_tensor_predictor], feed_dict={
+                training_cost_item, batch_predictor = self.session.run([self.tf_tensor_cost, self.tf_tensor_predictor], feed_dict={
                     self.tf_ph_x: semantic_segmentation_data.data_x[j:j + self.hyper_param_train_batch_size],
                     self.tf_ph_labels_one_hot: semantic_segmentation_data.labels_one_hot[j:j + self.hyper_param_train_batch_size],
                     self.tf_ph_labels: semantic_segmentation_data.labels[j:j + self.hyper_param_train_batch_size],
@@ -190,20 +207,9 @@ class SemanticSegmentation:
 
             costs_summary = tf.Summary()
             costs_summary.value.add(tag="Cost", simple_value=average_cost)
-            summary_writer.add_summary(costs_summary, tf.train.global_step(session, self.tf_variable_global_step))
+            summary_writer.add_summary(costs_summary, tf.train.global_step(self.session, self.tf_variable_global_step))
             print("Statistics for {}".format(cost_description))
             print("Average cost = {}".format(average_cost))
-
-            total_label_1_correct_predictions = 0
-            for i in range(semantic_segmentation_data.labels.shape[0]):
-                if (np.where(prediction_batches[i] == 1)[0].shape[0] > 0):
-                    total_label_1_correct_predictions = total_label_1_correct_predictions + np.where(np.take(semantic_segmentation_data.labels, np.where(prediction_batches[0] == 1)[0]) == 1)[0].shape[0]
-            if np.where(prediction_batches == 1)[0].shape[0] == 0:
-                print("Label 1 correct guess percentage 0")
-            else:
-                print("Label 1 correct guess percentage {}".format(total_label_1_correct_predictions / np.where(prediction_batches == 1)[0].shape[0]))
-            #print("Total percentage of correctly labelled pixels: {}".format(np.where(prediction_batches == labels)[0].shape[0] / (labels.shape[0] * labels.shape[1])))
-
             #semantic_segmentation_data.exportImage("c:/temp/picture.jpg", 0, prediction_batches[0])
 
 
@@ -211,10 +217,10 @@ class SemanticSegmentation:
             overlay_image = np.zeros((30, self.hyper_param_height, self.hyper_param_width, self.hyper_param_image_channels))
             for i in range(30):
                 overlay_image[i] = semantic_segmentation_data.overlay_image_with_labels(i, np.reshape(prediction_batches[i], (self.hyper_param_height, self.hyper_param_width)))
-            self.tf_variable_image.load(overlay_image, session)
+            self.tf_variable_image.load(overlay_image, self.session)
 
-            image_summary = session.run(self.tf_summary_image_predictions)
-            summary_writer.add_summary(image_summary, tf.train.global_step(session, self.tf_variable_global_step))
+            image_summary = self.session.run(self.tf_summary_image_predictions)
+            summary_writer.add_summary(image_summary, tf.train.global_step(self.session, self.tf_variable_global_step))
 
             #for i in range(30):
             #    overlay_image[i] = semantic_segmentation_data.overlay_image_with_labels(i, np.reshape(semantic_segmentation_data.labels[i], (self.hyper_param_height, self.hyper_param_width)))

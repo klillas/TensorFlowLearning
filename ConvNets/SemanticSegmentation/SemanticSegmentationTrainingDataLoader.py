@@ -13,7 +13,7 @@ class SemanticSegmentationTrainingDataLoader:
         image_height = 192
         image_channels = 3
         label_count = 2
-        training_set_ratio = 0.98
+        training_set_ratio = 0.96
         labels = np.zeros(shape=(data_set_size, image_height * image_width), dtype=np.uint8)
         data_x = np.zeros(shape=(data_set_size, image_height, image_width, image_channels),dtype=np.uint8)
         for i in range(data_set_size):
