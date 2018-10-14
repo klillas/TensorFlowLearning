@@ -129,7 +129,7 @@ semantic_segmentation.initialize(
     0.00003,
     batch_size=50,
     hyper_param_model_name="Model48",
-    load_existing_model=False,
+    load_existing_model=True,
     save_model_interval_seconds=300,
     dropout_keep_prob=0.1)
 semantic_segmentation.train_own_model()

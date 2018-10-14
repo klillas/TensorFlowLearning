@@ -82,7 +82,8 @@ class SemanticSegmentation:
         if self.hyper_param_load_existing_model == True:
             loader_path = "./stored_models/"
 
-            self.tf_model_saver = tf.train.import_meta_graph(loader_path + self.hyper_param_model_name + '-9.meta')
+            file_to_restore = tf.train.latest_checkpoint(loader_path) + ".meta"
+            self.tf_model_saver = tf.train.import_meta_graph(file_to_restore)
             self.tf_model_saver.restore(self.session, tf.train.latest_checkpoint(loader_path))
             self.tf_graph = self.session.graph
 
