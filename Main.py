@@ -126,10 +126,13 @@ semantic_segmentation.initialize(
     image_height,
     image_width,
     image_channels,
-    0.00003,
+    #0.0001, ==> Slowly decreasing
+    #0.03, ==> Slowly increasing
+    #0.001, ==> Decreasing
+    0.001,
     batch_size=50,
     hyper_param_model_name="Model49",
     load_existing_model=True,
-    save_model_interval_seconds=300,
-    dropout_keep_prob=0.30)
+    save_model_interval_seconds=60,
+    dropout_keep_prob=0.50)
 semantic_segmentation.train_own_model()

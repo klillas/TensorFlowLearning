@@ -11,7 +11,7 @@ public class GenerateTrainingData : MonoBehaviour {
 
    // Use this for initialization
    void Start () {
-      int examplesToCreate = 500;
+      int examplesToCreate = 5000;
       labelledItems = new List<GameObject>();
       for (int i = 0; i < 30; i++)
       {
@@ -32,7 +32,7 @@ public class GenerateTrainingData : MonoBehaviour {
       */
 
       var startTime = DateTime.Now;
-      for (int i = 0; i < examplesToCreate; i++)
+      for (int i = 500; i < examplesToCreate; i++)
       {
          foreach (var gameObject in visibleItems)
          {

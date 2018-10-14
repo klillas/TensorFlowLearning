@@ -135,7 +135,7 @@ class SemanticSegmentation:
                 self.tf_ph_droput_keep_prob: self.hyper_param_dropout_keep_prob
             })
 
-            if (i % 50 == 0):
+            if (i % 5 == 0):
                 print("")
                 print("")
                 print("#################################################################")
@@ -151,12 +151,13 @@ class SemanticSegmentation:
 
                 writer_validation.flush()
 
-            if (i % 50 == 0):
+            if (i % 5 == 0):
                 self._calculcate_and_log_statistics(
                     "Train cost",
                     self.session,
                     writer_train,
-                    self.data_train,
+                    # TODO: Use only a static subset of the total trainset now. Fix an incremental train calculation to get rid of this limitation.
+                    self.data_train[0:100],
                     plotPrediction = False,
                     calculate_cost = True
                 )
