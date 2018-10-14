@@ -77,21 +77,22 @@ class SemanticSegmentation:
             self.tf_ph_droput_keep_prob = tf.placeholder(tf.float32, name="dropout_keep_prob")
             self.tf_ph_image = tf.placeholder(tf.float32, (self.hyper_param_height, self.hyper_param_width, self.hyper_param_image_channels), name="image")
             self.tf_variable_global_step = tf.Variable(0, trainable=False, name='global_step')
+            self.tf_variable_image = tf.Variable(np.zeros((30, self.hyper_param_height, self.hyper_param_width, self.hyper_param_image_channels)))
 
         if self.hyper_param_load_existing_model == True:
             loader_path = "./stored_models/"
 
-            self.tf_model_saver = tf.train.import_meta_graph(loader_path + self.hyper_param_model_name + '-0.meta')
+            self.tf_model_saver = tf.train.import_meta_graph(loader_path + self.hyper_param_model_name + '-9.meta')
             self.tf_model_saver.restore(self.session, tf.train.latest_checkpoint(loader_path))
             self.tf_graph = self.session.graph
 
-            self.tf_variable_image = self.tf_graph.get_tensor_by_name("variable_image:0")
+            self.tf_variable_image = [v for v in tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES) if v.name == 'variable_image:0'][0]
             self.tf_ph_x = self.tf_graph.get_tensor_by_name("x:0")
             self.tf_ph_labels = self.tf_graph.get_tensor_by_name("labels:0")
             self.tf_ph_labels_one_hot = self.tf_graph.get_tensor_by_name("labels_one_hot:0")
             self.tf_ph_droput_keep_prob = self.tf_graph.get_tensor_by_name("dropout_keep_prob:0")
             self.tf_ph_image = self.tf_graph.get_tensor_by_name("image:0")
-            self.tf_variable_global_step = self.tf_graph.get_tensor_by_name("global_step:0")
+            self.tf_variable_global_step = [v for v in tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES) if v.name == 'global_step:0'][0]
 
         self.tf_summary_image_predictions = tf.summary.image("example prediction", self.tf_variable_image, 30)
 
@@ -116,8 +117,9 @@ class SemanticSegmentation:
         writer_train = tf.summary.FileWriter("./logs/" + self.hyper_param_model_name + "/train", self.session.graph)
         writer_validation = tf.summary.FileWriter("./logs/" + self.hyper_param_model_name + "/validation")
 
-        for i in range(0, 1000000):
+        for i in range(self.session.run(self.tf_variable_global_step), 1000000):
             print("Training step {}".format(i))
+            self.tf_variable_global_step.load(i, session=self.session)
             #####Train#####
             if self.hyper_param_train_batch_size > 0:
                 trainIds = np.random.randint(
