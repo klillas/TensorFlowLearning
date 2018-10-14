@@ -77,7 +77,7 @@ class SemanticSegmentation:
             self.tf_ph_droput_keep_prob = tf.placeholder(tf.float32, name="dropout_keep_prob")
             self.tf_ph_image = tf.placeholder(tf.float32, (self.hyper_param_height, self.hyper_param_width, self.hyper_param_image_channels), name="image")
             self.tf_variable_global_step = tf.Variable(0, trainable=False, name='global_step')
-            self.tf_variable_image = tf.Variable(np.zeros((30, self.hyper_param_height, self.hyper_param_width, self.hyper_param_image_channels)))
+            self.tf_variable_image = tf.Variable(np.zeros((30, self.hyper_param_height, self.hyper_param_width, self.hyper_param_image_channels)), name="variable_image")
 
         if self.hyper_param_load_existing_model == True:
             loader_path = "./stored_models/"
@@ -101,8 +101,6 @@ class SemanticSegmentation:
         self._initialize_cost()
         self._initialize_optimization()
         self._initialize_predictor()
-
-        self.tf_variable_image = tf.Variable(np.zeros((30, self.hyper_param_height, self.hyper_param_width, self.hyper_param_image_channels)), name="variable_image")
 
         if self.hyper_param_load_existing_model == False:
             self.session.run(tf.global_variables_initializer())
@@ -212,8 +210,7 @@ class SemanticSegmentation:
             overlay_image = np.zeros((30, self.hyper_param_height, self.hyper_param_width, self.hyper_param_image_channels))
             for i in range(30):
                 overlay_image[i] = semantic_segmentation_data.overlay_image_with_labels(i, np.reshape(prediction_batches[i], (self.hyper_param_height, self.hyper_param_width)))
-            self.session.run(self.tf_variable_image, feed_dict={self.tf_variable_image: overlay_image})
-            #self.tf_variable_image.load(overlay_image, session)
+            self.tf_variable_image.load(overlay_image, session)
 
             image_summary = session.run(self.tf_summary_image_predictions)
             summary_writer.add_summary(image_summary, tf.train.global_step(session, self.tf_variable_global_step))
