@@ -8,12 +8,12 @@ class SemanticSegmentationTrainingDataLoader:
 
     def generate_traindata_from_depthvision_pictures(self):
         trainingDataPath = "C:/temp/training/"
-        data_set_size = 5000
+        data_set_size = 100
         image_width = 256
         image_height = 192
         image_channels = 3
         label_count = 2
-        training_set_ratio = 0.96
+        training_set_ratio = 0.50
         labels = np.zeros(shape=(data_set_size, image_height * image_width), dtype=np.uint8)
         data_x = np.zeros(shape=(data_set_size, image_height, image_width, image_channels),dtype=np.uint8)
         for i in range(data_set_size):

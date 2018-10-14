@@ -14,6 +14,7 @@ class SemanticSegmentation:
     tf_ph_labels_one_hot = None
     tf_ph_droput_keep_prob = None
     tf_ph_image = None
+    tf_ph_learning_rate = None
 
     tf_tensor_cost = None
     tf_tensor_model = None
@@ -76,6 +77,7 @@ class SemanticSegmentation:
             self.tf_ph_labels_one_hot = tf.placeholder(tf.int32, [None, self.hyper_param_height * self.hyper_param_width, self.hyper_param_label_size], name="labels_one_hot")
             self.tf_ph_droput_keep_prob = tf.placeholder(tf.float32, name="dropout_keep_prob")
             self.tf_ph_image = tf.placeholder(tf.float32, (self.hyper_param_height, self.hyper_param_width, self.hyper_param_image_channels), name="image")
+            self.tf_ph_learning_rate = tf.placeholder(tf.float32, shape=[], name="learning_rate")
             self.tf_variable_global_step = tf.Variable(0, trainable=False, name='global_step')
             self.tf_variable_image = tf.Variable(np.zeros((30, self.hyper_param_height, self.hyper_param_width, self.hyper_param_image_channels)), name="variable_image")
 
@@ -94,6 +96,7 @@ class SemanticSegmentation:
             self.tf_ph_droput_keep_prob = self.tf_graph.get_tensor_by_name("dropout_keep_prob:0")
             self.tf_ph_image = self.tf_graph.get_tensor_by_name("image:0")
             self.tf_variable_global_step = [v for v in tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES) if v.name == 'global_step:0'][0]
+            self.tf_ph_learning_rate = self.tf_graph.get_tensor_by_name("learning_rate:0")
 
         self.tf_summary_image_predictions = tf.summary.image("example prediction", self.tf_variable_image, 30)
 
@@ -119,8 +122,10 @@ class SemanticSegmentation:
         batch_training_cost_buffer = np.zeros(((int) (self.data_train.data_x.shape[0] / self.hyper_param_train_batch_size)))
         first_iteration = True
 
+        train_cost_last_print = 0
         for i in range(self.session.run(self.tf_variable_global_step), 1000000):
-            print("Training step {}".format(i))
+            if i % 25 == 0:
+                print("Training step {}".format(i))
             self.tf_variable_global_step.load(i, session=self.session)
             #####Train#####
             if self.hyper_param_train_batch_size > 0:
@@ -132,16 +137,24 @@ class SemanticSegmentation:
                     self.data_train.data_x.shape[0],
                     size=self.data_train.data_x.shape[0])
 
-            _, batch_training_cost = self.session.run([self.tf_tensor_train, self.tf_tensor_cost], feed_dict={
+            _ = self.session.run(self.tf_tensor_train, feed_dict={
                 self.tf_ph_x: self.data_train.data_x[trainIds, :],
                 self.tf_ph_labels_one_hot: self.data_train.labels_one_hot[trainIds, :],
-                self.tf_ph_droput_keep_prob: self.hyper_param_dropout_keep_prob
+                self.tf_ph_droput_keep_prob: self.hyper_param_dropout_keep_prob,
+                self.tf_ph_learning_rate: self.hyper_param_learning_rate
+            })
+
+            batch_training_cost = self.session.run(self.tf_tensor_cost, feed_dict={
+                self.tf_ph_x: self.data_train.data_x[trainIds, :],
+                self.tf_ph_labels_one_hot: self.data_train.labels_one_hot[trainIds, :],
+                self.tf_ph_droput_keep_prob: 1.0,
+                self.tf_ph_learning_rate: self.hyper_param_learning_rate
             })
 
             if first_iteration == True:
                 # TODO: This is a temporary solution until we can store the actual cost in a tensor and restore it
                 batch_training_cost_buffer.fill(batch_training_cost)
-            np.roll(batch_training_cost_buffer, 1)
+            batch_training_cost_buffer = np.roll(batch_training_cost_buffer, 1)
             batch_training_cost_buffer[0] = batch_training_cost
             mean_training_cost = np.mean(batch_training_cost_buffer)
 
@@ -149,11 +162,14 @@ class SemanticSegmentation:
             costs_summary.value.add(tag="Cost", simple_value=mean_training_cost)
             writer_train.add_summary(costs_summary, tf.train.global_step(self.session, self.tf_variable_global_step))
 
-            if (i % 5 == 0):
+            if (i % 50 == 0):
                 print("")
                 print("")
                 print("#################################################################")
                 print("Train batch cost: {}".format(mean_training_cost))
+                if first_iteration == False:
+                    print("Train batch cost delta: {}".format(mean_training_cost - train_cost_last_print))
+                train_cost_last_print = mean_training_cost
                 print("")
                 print("Validation test")
                 self._calculcate_and_log_statistics(
@@ -228,10 +244,6 @@ class SemanticSegmentation:
 
             #image_summary = session.run(self.tf_summary_image_predictions)
             #summary_writer.add_summary(image_summary, tf.train.global_step(session, self.tf_variable_global_step))
-
-            print("")
-
-        print("")
         print("")
 
 
@@ -252,7 +264,7 @@ class SemanticSegmentation:
             loss_op = tf.reduce_mean(cross_entropy, name="fcn_loss")
 
             # The model implements this operation to find the weights/parameters that would yield correct pixel labels
-            self.tf_tensor_train = tf.train.AdamOptimizer(learning_rate=self.hyper_param_learning_rate).minimize(loss_op, name="fcn_train_op")
+            self.tf_tensor_train = tf.train.AdamOptimizer(learning_rate=self.tf_ph_learning_rate).minimize(loss_op, name="fcn_train_op")
 
         if self.hyper_param_load_existing_model == True:
             self.tf_tensor_train = self.tf_graph.get_operation_by_name("fcn_train_op")
@@ -324,10 +336,10 @@ class SemanticSegmentation:
 
             model = tf.concat([model, model_conv1_lowres_flat, model_conv2_lowres_flat], axis=1)
 
-            model = tf.nn.dropout(
-                model,
-                keep_prob=self.tf_ph_droput_keep_prob
-            )
+            #model = tf.nn.dropout(
+            #    model,
+            #    keep_prob=self.tf_ph_droput_keep_prob
+            #)
 
             model = tf.layers.dense(
                 inputs=model,
@@ -335,10 +347,10 @@ class SemanticSegmentation:
                 name="Layer4"
             )
 
-            model = tf.nn.dropout(
-                model,
-                keep_prob=self.tf_ph_droput_keep_prob
-            )
+            #model = tf.nn.dropout(
+            #    model,
+            #    keep_prob=self.tf_ph_droput_keep_prob
+            #)
 
             model = tf.layers.dense(
                 inputs=model,
