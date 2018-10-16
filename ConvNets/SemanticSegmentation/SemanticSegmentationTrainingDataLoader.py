@@ -6,17 +6,26 @@ from ConvNets.SemanticSegmentation.SemanticSegmentationData import SemanticSegme
 
 class SemanticSegmentationTrainingDataLoader:
 
+    def load_picture_data(self, file_path):
+        picture_data = misc.imread(file_path)
+        return picture_data
+
+    def initialize(self):
+
+
     def generate_traindata_from_depthvision_pictures(self):
         trainingDataPath = "C:/temp/training/"
-        data_set_size = 100
+        data_set_size = 15000
         image_width = 256
         image_height = 192
         image_channels = 3
         label_count = 2
-        training_set_ratio = 0.50
+        training_set_ratio = 0.98
         labels = np.zeros(shape=(data_set_size, image_height * image_width), dtype=np.uint8)
         data_x = np.zeros(shape=(data_set_size, image_height, image_width, image_channels),dtype=np.uint8)
         for i in range(data_set_size):
+            if i % 1000 == 0:
+                print("{} examples loaded".format(i))
             leftEyeImage = misc.imread(trainingDataPath + str(i) + "_CameraLeftEye.jpg")
             #rightEyeImage = misc.imread(trainingDataPath + str(i) + "_CameraRightEye.jpg")
             #bothEyes = np.concatenate((leftEyeImage, rightEyeImage))

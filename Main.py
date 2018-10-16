@@ -129,10 +129,15 @@ semantic_segmentation.initialize(
     #0.0001, ==> Slowly decreasing
     #0.03, ==> Slowly increasing
     #0.001, ==> Decreasing
-    0.00001,
+    0.001,
     batch_size=50,
-    hyper_param_model_name="Model50",
+    hyper_param_model_name="Model54",
     load_existing_model=False,
-    save_model_interval_seconds=1200,
+    save_model_interval_seconds=300,
     dropout_keep_prob=1)
+
+#for i in range(5000, 5100):
+#    picture_data = training_data_generator.load_picture_data("c:/temp/training/" + str(i) +"_CameraLeftEye.jpg")
+#    semantic_segmentation.predict_and_create_image("c:/temp/pic" + str(i) + ".jpg", picture_data)
+
 semantic_segmentation.train_own_model()

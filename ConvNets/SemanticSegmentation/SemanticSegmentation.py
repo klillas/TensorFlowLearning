@@ -3,6 +3,8 @@ import numpy as np
 from ConvNets.SemanticSegmentation import SemanticSegmentationData
 from datetime import datetime
 from datetime import timedelta
+from scipy import misc
+from skimage import data, color, io, img_as_float
 
 
 class SemanticSegmentation:
@@ -119,9 +121,6 @@ class SemanticSegmentation:
         writer_train = tf.summary.FileWriter("./logs/" + self.hyper_param_model_name + "/train", self.session.graph)
         writer_validation = tf.summary.FileWriter("./logs/" + self.hyper_param_model_name + "/validation")
 
-        batch_training_cost_buffer = np.zeros(((int) (self.data_train.data_x.shape[0] / self.hyper_param_train_batch_size)))
-        first_iteration = True
-
         train_cost_last_print = 0
         for i in range(self.session.run(self.tf_variable_global_step), 1000000):
             if i % 25 == 0:
@@ -137,6 +136,8 @@ class SemanticSegmentation:
                     self.data_train.data_x.shape[0],
                     size=self.data_train.data_x.shape[0])
 
+            #self.data_train.exportImageWithLabels("c:/temp/pic.jpg", 0,  np.reshape(self.data_train.labels[0], (self.hyper_param_height, self.hyper_param_width)))
+
             _ = self.session.run(self.tf_tensor_train, feed_dict={
                 self.tf_ph_x: self.data_train.data_x[trainIds, :],
                 self.tf_ph_labels_one_hot: self.data_train.labels_one_hot[trainIds, :],
@@ -151,25 +152,17 @@ class SemanticSegmentation:
                 self.tf_ph_learning_rate: self.hyper_param_learning_rate
             })
 
-            if first_iteration == True:
-                # TODO: This is a temporary solution until we can store the actual cost in a tensor and restore it
-                batch_training_cost_buffer.fill(batch_training_cost)
-            batch_training_cost_buffer = np.roll(batch_training_cost_buffer, 1)
-            batch_training_cost_buffer[0] = batch_training_cost
-            mean_training_cost = np.mean(batch_training_cost_buffer)
-
             costs_summary = tf.Summary()
-            costs_summary.value.add(tag="Cost", simple_value=mean_training_cost)
+            costs_summary.value.add(tag="Cost", simple_value=batch_training_cost)
             writer_train.add_summary(costs_summary, tf.train.global_step(self.session, self.tf_variable_global_step))
 
             if (i % 50 == 0):
                 print("")
                 print("")
                 print("#################################################################")
-                print("Train batch cost: {}".format(mean_training_cost))
-                if first_iteration == False:
-                    print("Train batch cost delta: {}".format(mean_training_cost - train_cost_last_print))
-                train_cost_last_print = mean_training_cost
+                print("Train batch cost: {}".format(batch_training_cost))
+                print("Train batch cost delta: {}".format(batch_training_cost - train_cost_last_print))
+                train_cost_last_print = batch_training_cost
                 print("")
                 print("Validation test")
                 self._calculcate_and_log_statistics(
@@ -200,8 +193,6 @@ class SemanticSegmentation:
                     save_path="./stored_models/" + self.hyper_param_model_name,
                     global_step=tf.train.global_step(self.session, self.tf_variable_global_step))
                 print("Model state saved")
-
-            first_iteration = False
 
     def _calculcate_and_log_statistics(self, cost_description, summary_writer, semantic_segmentation_data: SemanticSegmentationData, plotPrediction, calculate_cost):
         if calculate_cost == True:
@@ -274,67 +265,67 @@ class SemanticSegmentation:
         if self.hyper_param_load_existing_model == False:
             model = tf.layers.conv2d(
                 inputs=self.tf_ph_x,
-                filters=2,
-                kernel_size=[8, 8],
+                filters=4,
+                kernel_size=[2, 2],
                 padding="same",
                 activation=tf.nn.relu,
                 name="Layer1"
             )
-            model_conv1_lowres = tf.layers.max_pooling2d(
-                inputs=model,
-                pool_size=[8, 8],
-                strides=8
-            )
-            model_conv1_lowres_flat = tf.reshape(model_conv1_lowres, (-1, model_conv1_lowres.shape[1] * model_conv1_lowres.shape[2] * model_conv1_lowres.shape[3]))
+            #model_conv1_lowres = tf.layers.max_pooling2d(
+            #    inputs=model,
+            #    pool_size=[8, 8],
+            #    strides=8
+            #)
+            #model_conv1_lowres_flat = tf.reshape(model_conv1_lowres, (-1, model_conv1_lowres.shape[1] * model_conv1_lowres.shape[2] * model_conv1_lowres.shape[3]))
 
-            model = tf.layers.max_pooling2d(
-                inputs=model,
-                pool_size=[3, 3],
-                strides=3
-            )
+            #model = tf.layers.max_pooling2d(
+            #    inputs=model,
+            #    pool_size=[4, 4],
+            #    strides=4
+            #)
 
-            model = tf.layers.conv2d(
-                inputs=model,
-                filters=8,
-                kernel_size=[4, 4],
-                padding="same",
-                activation=tf.nn.relu,
-                name="Layer2"
-            )
+            #model = tf.layers.conv2d(
+            #    inputs=model,
+            #    filters=8,
+            #    kernel_size=[4, 4],
+            #    padding="same",
+            #    activation=tf.nn.relu,
+            #    name="Layer2"
+            #)
 
-            model_conv2_lowres = tf.layers.max_pooling2d(
-                inputs=model,
-                pool_size=[8, 8],
-                strides=8
-            )
-            model_conv2_lowres_flat = tf.reshape(model_conv2_lowres, (-1, model_conv2_lowres.shape[1] * model_conv2_lowres.shape[2] * model_conv2_lowres.shape[3]))
+            #model_conv2_lowres = tf.layers.max_pooling2d(
+            #    inputs=model,
+            #    pool_size=[8, 8],
+            #    strides=8
+            #)
+            #model_conv2_lowres_flat = tf.reshape(model_conv2_lowres, (-1, model_conv2_lowres.shape[1] * model_conv2_lowres.shape[2] * model_conv2_lowres.shape[3]))
 
-            model = tf.layers.max_pooling2d(
-                inputs=model,
-                pool_size=[3, 3],
-                strides=3
-            )
+            #model = tf.layers.max_pooling2d(
+            #    inputs=model,
+            #    pool_size=[3, 3],
+            #    strides=3
+            #)
 
-            model = tf.layers.conv2d(
-                inputs=model,
-                filters=32,
-                kernel_size=[2, 2],
-                padding="same",
-                activation=tf.nn.relu,
-                name="Layer3"
-            )
+            #model = tf.layers.conv2d(
+            #    inputs=model,
+            #    filters=32,
+            #    kernel_size=[2, 2],
+            #    padding="same",
+            #    activation=tf.nn.relu,
+            #    name="Layer3"
+            #)
 
-            model = tf.layers.max_pooling2d(
-                inputs=model,
-                pool_size=[3, 3],
-                strides=3
-            )
+            #model = tf.layers.max_pooling2d(
+            #    inputs=model,
+            #    pool_size=[3, 3],
+            #    strides=3
+            #)
 
             model = tf.reshape(
                 model,
                 (-1, model.shape[1] * model.shape[2] * model.shape[3]))
 
-            model = tf.concat([model, model_conv1_lowres_flat, model_conv2_lowres_flat], axis=1)
+            #model = tf.concat([model, model_conv1_lowres_flat, model_conv2_lowres_flat], axis=1)
 
             #model = tf.nn.dropout(
             #    model,
@@ -343,9 +334,15 @@ class SemanticSegmentation:
 
             model = tf.layers.dense(
                 inputs=model,
-                units=2014,
+                units=100,
                 name="Layer4"
             )
+
+            #model = tf.layers.dense(
+            #    inputs=model,
+            #    units=500,
+            #    name="Layerfdsa"
+            #)
 
             #model = tf.nn.dropout(
             #    model,
@@ -390,3 +387,44 @@ class SemanticSegmentation:
 
         if self.hyper_param_load_existing_model == True:
             self.tf_tensor_cost = self.tf_graph.get_tensor_by_name("fcn_loss:0")
+
+
+
+    def predict_and_create_image(self, path, image_data):
+        prediction = self.session.run(self.tf_tensor_predictor, feed_dict={
+            self.tf_ph_x: np.reshape(image_data, (-1, image_data.shape[0], image_data.shape[1], image_data.shape[2])),
+            self.tf_ph_droput_keep_prob: 1.0
+        })
+
+        self._export_image_with_labels(path, image_data, np.reshape(prediction, (self.hyper_param_height, self.hyper_param_width)))
+
+        a = 5
+
+    def _export_image_with_labels(self, path, image_data, predicted_labels):
+        misc.imsave(path, self._overlay_image_with_labels(image_data, predicted_labels))
+
+    def _overlay_image_with_labels(self, image_data, predicted_labels):
+        color_mask = np.zeros((predicted_labels.shape[0], predicted_labels.shape[1], 3))
+        color_mask[np.where(predicted_labels == 1)] = [1, 0, 0]
+
+        alpha = 0.7
+        # Convert the input image and color mask to Hue Saturation Value (HSV)
+        # colorspace
+        img_hsv = color.rgb2hsv(image_data)
+        color_mask_hsv = color.rgb2hsv(color_mask)
+
+        # Replace the hue and saturation of the original image
+        # with that of the color mask
+        img_hsv[..., 0] = color_mask_hsv[..., 0]
+        img_hsv[..., 1] = color_mask_hsv[..., 1] * alpha
+
+        img_masked = color.hsv2rgb(img_hsv)
+
+        # Display the output
+        #f, (ax0) = plt.subplots(1, 1, subplot_kw={'xticks': [], 'yticks': []})
+        #ax0.imshow(self.data_x[id], cmap=plt.cm.gray)
+        #ax1.imshow(color_mask)
+        #ax0.imshow(img_masked)
+        #plt.show()
+
+        return img_masked

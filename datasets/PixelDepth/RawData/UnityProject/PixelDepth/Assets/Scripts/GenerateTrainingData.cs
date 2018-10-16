@@ -11,7 +11,7 @@ public class GenerateTrainingData : MonoBehaviour {
 
    // Use this for initialization
    void Start () {
-      int examplesToCreate = 5000;
+      int examplesToCreate = 100000;
       labelledItems = new List<GameObject>();
       for (int i = 0; i < 30; i++)
       {
@@ -32,11 +32,23 @@ public class GenerateTrainingData : MonoBehaviour {
       */
 
       var startTime = DateTime.Now;
-      for (int i = 500; i < examplesToCreate; i++)
+      for (int i = 5520; i < examplesToCreate; i++)
       {
          foreach (var gameObject in visibleItems)
          {
             RandomlyPlaceObjectInCameraView(Camera.allCameras[0], gameObject);
+         }
+
+         foreach (var obj in visibleItems)
+         {
+            if (rand.NextDouble() < 0.5)
+            {
+               obj.SetActive(false);
+            }
+            else
+            {
+               obj.SetActive(true);
+            }
          }
 
          foreach (var camera in Camera.allCameras)
