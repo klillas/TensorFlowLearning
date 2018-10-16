@@ -1,6 +1,6 @@
 import tensorflow as tf
 import numpy as np
-from ConvNets.SemanticSegmentation import SemanticSegmentationData
+from ConvNets.SemanticSegmentation import SemanticSegmentationData, SemanticSegmentationTrainingDataLoader
 from datetime import datetime
 from datetime import timedelta
 from scipy import misc
@@ -8,8 +8,7 @@ from skimage import data, color, io, img_as_float
 
 
 class SemanticSegmentation:
-    data_train = None
-    data_validation = None
+    data_generator = None
 
     tf_ph_x = None
     tf_ph_labels = None
@@ -46,8 +45,7 @@ class SemanticSegmentation:
 
     def initialize(
             self,
-            data_train: SemanticSegmentationData,
-            data_validation: SemanticSegmentationData,
+            data_generator: SemanticSegmentationTrainingDataLoader,
             image_height,
             image_width,
             image_channels,
@@ -57,19 +55,17 @@ class SemanticSegmentation:
             load_existing_model,
             save_model_interval_seconds,
             dropout_keep_prob):
+        self.data_generator = data_generator
         self.hyper_param_width = image_width
         self.hyper_param_height = image_height
         self.hyper_param_image_channels = image_channels
-        self.hyper_param_label_size = data_train.label_count
+        self.hyper_param_label_size = data_generator.label_count
         self.hyper_param_learning_rate = learning_rate
         self.hyper_param_train_batch_size = batch_size
         self.hyper_param_model_name = hyper_param_model_name
         self.hyper_param_load_existing_model = load_existing_model
         self.hyper_param_save_model_interval_seconds = save_model_interval_seconds
         self.hyper_param_dropout_keep_prob = dropout_keep_prob
-
-        self.data_train = data_train
-        self.data_validation = data_validation
 
         self.session = tf.Session()
 
@@ -109,7 +105,7 @@ class SemanticSegmentation:
 
         if self.hyper_param_load_existing_model == False:
             self.session.run(tf.global_variables_initializer())
-            self.tf_model_saver = tf.train.Saver(max_to_keep=10, keep_checkpoint_every_n_hours=1)
+        self.tf_model_saver = tf.train.Saver(max_to_keep=3, keep_checkpoint_every_n_hours=1)
 
 
     def train_own_model(self):
@@ -123,31 +119,23 @@ class SemanticSegmentation:
 
         train_cost_last_print = 0
         for i in range(self.session.run(self.tf_variable_global_step), 1000000):
+            data_train = self.data_generator.load_next_batch()
             if i % 25 == 0:
                 print("Training step {}".format(i))
             self.tf_variable_global_step.load(i, session=self.session)
             #####Train#####
-            if self.hyper_param_train_batch_size > 0:
-                trainIds = np.random.randint(
-                    self.data_train.data_x.shape[0],
-                    size=self.hyper_param_train_batch_size)
-            else:
-                trainIds = np.random.randint(
-                    self.data_train.data_x.shape[0],
-                    size=self.data_train.data_x.shape[0])
-
             #self.data_train.exportImageWithLabels("c:/temp/pic.jpg", 0,  np.reshape(self.data_train.labels[0], (self.hyper_param_height, self.hyper_param_width)))
 
             _ = self.session.run(self.tf_tensor_train, feed_dict={
-                self.tf_ph_x: self.data_train.data_x[trainIds, :],
-                self.tf_ph_labels_one_hot: self.data_train.labels_one_hot[trainIds, :],
+                self.tf_ph_x: data_train.data_x,
+                self.tf_ph_labels_one_hot: data_train.labels_one_hot,
                 self.tf_ph_droput_keep_prob: self.hyper_param_dropout_keep_prob,
                 self.tf_ph_learning_rate: self.hyper_param_learning_rate
             })
 
             batch_training_cost = self.session.run(self.tf_tensor_cost, feed_dict={
-                self.tf_ph_x: self.data_train.data_x[trainIds, :],
-                self.tf_ph_labels_one_hot: self.data_train.labels_one_hot[trainIds, :],
+                self.tf_ph_x: data_train.data_x,
+                self.tf_ph_labels_one_hot: data_train.labels_one_hot,
                 self.tf_ph_droput_keep_prob: 1.0,
                 self.tf_ph_learning_rate: self.hyper_param_learning_rate
             })
@@ -157,6 +145,8 @@ class SemanticSegmentation:
             writer_train.add_summary(costs_summary, tf.train.global_step(self.session, self.tf_variable_global_step))
 
             if (i % 50 == 0):
+                # TODO: Just here now to avoid runtime error. Needs to use its separate batch of validation examples
+                data_validation = self.data_generator.load_next_batch()
                 print("")
                 print("")
                 print("#################################################################")
@@ -168,7 +158,7 @@ class SemanticSegmentation:
                 self._calculcate_and_log_statistics(
                     "Validation cost",
                     writer_validation,
-                    self.data_validation,
+                    data_validation,
                     plotPrediction = True,
                     calculate_cost = True
                 )

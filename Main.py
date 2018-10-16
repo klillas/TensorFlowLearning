@@ -118,22 +118,24 @@ print("")
 # Load training and eval data
 print("Loading training data")
 training_data_generator = SemanticSegmentationTrainingDataLoader()
-semantic_segmentation_data_train, semantic_segmentation_data_validation, image_height, image_width, image_channels = training_data_generator.generate_traindata_from_depthvision_pictures()
+training_data_generator.initialize(
+    batch_size=50,
+    probability_delete_example=0.1)
+
 semantic_segmentation = SemanticSegmentation()
 semantic_segmentation.initialize(
-    semantic_segmentation_data_train,
-    semantic_segmentation_data_validation,
-    image_height,
-    image_width,
-    image_channels,
+    training_data_generator,
+    training_data_generator.image_height,
+    training_data_generator.image_width,
+    training_data_generator.image_channels,
     #0.0001, ==> Slowly decreasing
     #0.03, ==> Slowly increasing
     #0.001, ==> Decreasing
     0.001,
-    batch_size=50,
-    hyper_param_model_name="Model54",
+    batch_size=training_data_generator.batch_size,
+    hyper_param_model_name="Model56",
     load_existing_model=False,
-    save_model_interval_seconds=300,
+    save_model_interval_seconds=1800,
     dropout_keep_prob=1)
 
 #for i in range(5000, 5100):

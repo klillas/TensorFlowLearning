@@ -11,7 +11,6 @@ public class GenerateTrainingData : MonoBehaviour {
 
    // Use this for initialization
    void Start () {
-      int examplesToCreate = 100000;
       labelledItems = new List<GameObject>();
       for (int i = 0; i < 30; i++)
       {
@@ -32,8 +31,13 @@ public class GenerateTrainingData : MonoBehaviour {
       */
 
       var startTime = DateTime.Now;
-      for (int i = 5520; i < examplesToCreate; i++)
+      for (int i = 10000000; i < int.MaxValue; i++)
       {
+         while (Directory.GetFiles(trainingFolderLocation, "*.dat", SearchOption.TopDirectoryOnly).Length > 1000)
+         {
+            System.Threading.Thread.Sleep(500);
+         }
+
          foreach (var gameObject in visibleItems)
          {
             RandomlyPlaceObjectInCameraView(Camera.allCameras[0], gameObject);
@@ -56,24 +60,10 @@ public class GenerateTrainingData : MonoBehaviour {
             TakeScreenshot(camera, i);
          }
 
-         if (GenerateSemanticSegmentationTable(i) == false)
-         {
-            // Not enough labelled hits in picture. Discard it.
-            var filesToDelete = Directory.GetFiles(trainingFolderLocation, "*" + i + "*");
-            if (filesToDelete.Length != 3)
-            {
-               throw new NotImplementedException("Training data generator found the wrong amount of files to delete");
-            }
-            foreach (var fileToDelete in filesToDelete)
-            {
-               File.Delete(fileToDelete);
-               i = i - 1;
-            }
-         }
+         GenerateSemanticSegmentationTable(i);
       }
       var endTime = DateTime.Now;
       var timespan = endTime - startTime;
-      print("Time per example: " + timespan.Milliseconds / examplesToCreate + "ms");
    }
 
    void DeleteExampleWithId(int id)
@@ -91,7 +81,7 @@ public class GenerateTrainingData : MonoBehaviour {
       gameObject.transform.position = worldPos;
    }
 
-   private bool GenerateSemanticSegmentationTable(int id)
+   private void GenerateSemanticSegmentationTable(int id)
    {
       // Generate semantic segmentation table
       int width = Camera.allCameras[0].pixelWidth;
@@ -123,12 +113,8 @@ public class GenerateTrainingData : MonoBehaviour {
          }
       }
 
-      File.WriteAllBytes(trainingFolderLocation + "/" + id + "_labels.dat", semanticSegmentationTable);
-      if (pixelsLabeled > 100)
-      {
-         return true;
-      }
-      return false;
+      File.WriteAllBytes(trainingFolderLocation + "/" + id + "_labels.xxx", semanticSegmentationTable);
+      File.Move(trainingFolderLocation + "/" + id + "_labels.xxx", trainingFolderLocation + "/" + id + "_labels.dat");
    }
 
    private void TakeScreenshot(Camera camera, int id)
