@@ -4,40 +4,75 @@ using System.IO;
 using UnityEngine;
 
 public class GenerateTrainingData : MonoBehaviour {
+   // Use this for initialization
+   void Start()
+   {
+      var worker = new WorkerThread();
+
+      worker.StartThread();
+   }
+}
+
+public class WorkerThread : MonoBehaviour
+{
+   private class LabelledItem
+   {
+      public GameObject gameObject;
+      public int label;
+
+      public LabelledItem(GameObject gameObject, int label)
+      {
+         this.gameObject = gameObject;
+         this.label = label;
+      }
+   }
+
    string trainingFolderLocation = "c:/temp/training/";
    List<GameObject> visibleItems = new List<GameObject>();
-   List<GameObject> labelledItems;
+   List<LabelledItem> labelledItems;
    System.Random rand = new System.Random();
 
+   TimeSpan sleepTime = new TimeSpan(0, 0, 0);
+   TimeSpan objectPlacementTime = new TimeSpan(0, 0, 0);
+   TimeSpan labelCreationTime = new TimeSpan(0, 0, 0);
+   TimeSpan fileSavingTime = new TimeSpan(0, 0, 0);
+   TimeSpan screenShotTime = new TimeSpan(0, 0, 0);
+
    // Use this for initialization
-   void Start () {
-      labelledItems = new List<GameObject>();
-      for (int i = 0; i < 30; i++)
+   public void StartThread()
+   {
+      labelledItems = new List<LabelledItem>();
+      for (int i = 0; i < 20; i++)
       {
          var labelledItem = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
          var collider = labelledItem.GetComponent<Collider>();
          Destroy(collider);
          labelledItem.AddComponent<MeshCollider>();
-         labelledItems.Add(labelledItem);
+         labelledItems.Add(new LabelledItem(labelledItem, 1));
          visibleItems.Add(labelledItem);
       }
 
-      /*
-      for (int i = 0; i < 10; i++)
+      for (int i = 0; i < 20; i++)
       {
-         var otherObject = GameObject.CreatePrimitive(PrimitiveType.Quad);
-         visibleItems.Add(otherObject);
+         var labelledItem = GameObject.CreatePrimitive(PrimitiveType.Quad);
+         var collider = labelledItem.GetComponent<Collider>();
+         Destroy(collider);
+         labelledItem.AddComponent<MeshCollider>();
+         labelledItems.Add(new LabelledItem(labelledItem, 2));
+         visibleItems.Add(labelledItem);
       }
-      */
 
       var startTime = DateTime.Now;
-      for (int i = 10000000; i < int.MaxValue; i++)
+      while (true)
       {
+         var now = DateTime.Now;
          while (Directory.GetFiles(trainingFolderLocation, "*.dat", SearchOption.TopDirectoryOnly).Length > 1000)
          {
             System.Threading.Thread.Sleep(500);
          }
+         sleepTime += DateTime.Now - now;
 
+         now = DateTime.Now;
          foreach (var gameObject in visibleItems)
          {
             RandomlyPlaceObjectInCameraView(Camera.allCameras[0], gameObject);
@@ -54,21 +89,27 @@ public class GenerateTrainingData : MonoBehaviour {
                obj.SetActive(true);
             }
          }
+         objectPlacementTime += DateTime.Now - now;
 
+         var guid = Guid.NewGuid();
          foreach (var camera in Camera.allCameras)
          {
-            TakeScreenshot(camera, i);
+            TakeScreenshot(camera, guid);
          }
 
-         GenerateSemanticSegmentationTable(i);
+         GenerateSemanticSegmentationTable(guid);
+
+         using (var tw = new StreamWriter(@"c:\temp\diagnostics.txt", false))
+         {
+            tw.WriteLine("Sleep time: " + this.sleepTime.TotalSeconds + " s");
+            tw.WriteLine("objectPlacementTime: " + this.objectPlacementTime.TotalSeconds + " s");
+            tw.WriteLine("labelCreationTime: " + this.labelCreationTime.TotalSeconds + " s");
+            tw.WriteLine("fileSavingTime: " + this.fileSavingTime.TotalSeconds + " s");
+            tw.WriteLine("screenShotTime: " + this.screenShotTime.TotalSeconds + " s");
+            tw.Flush();
+            tw.Close();
+         }
       }
-      var endTime = DateTime.Now;
-      var timespan = endTime - startTime;
-   }
-
-   void DeleteExampleWithId(int id)
-   {
-
    }
 
    void RandomlyPlaceObjectInCameraView(Camera camera, GameObject gameObject)
@@ -81,8 +122,9 @@ public class GenerateTrainingData : MonoBehaviour {
       gameObject.transform.position = worldPos;
    }
 
-   private void GenerateSemanticSegmentationTable(int id)
+   private void GenerateSemanticSegmentationTable(Guid id)
    {
+      var startTime = DateTime.Now;
       // Generate semantic segmentation table
       int width = Camera.allCameras[0].pixelWidth;
       int height = Camera.allCameras[0].pixelHeight;
@@ -91,7 +133,6 @@ public class GenerateTrainingData : MonoBehaviour {
       byte label1 = Convert.ToByte('1');
       byte deliminator = Convert.ToByte(' ');
       int arrPos = 0;
-      int pixelsLabeled = 0;
       for (int row = height - 1; row >= 0; row--)
       {
          for (int column = 0; column < width; column++)
@@ -99,26 +140,36 @@ public class GenerateTrainingData : MonoBehaviour {
             Ray ray = Camera.allCameras[0].ScreenPointToRay(new Vector3(column, row, 0));
             RaycastHit hit;
             Physics.Raycast(ray, out hit);
-            if (hit.collider != null && labelledItems.Contains(hit.collider.gameObject))
+
+            if (hit.collider == null)
             {
-               semanticSegmentationTable[arrPos] = 1;
+               semanticSegmentationTable[arrPos] = 0;
             }
             else
             {
-               pixelsLabeled++;
-               semanticSegmentationTable[arrPos] = 0;
+               foreach (var labelledItem in labelledItems)
+               {
+                  if (hit.collider.gameObject == labelledItem.gameObject)
+                  {
+                     semanticSegmentationTable[arrPos] = (byte)labelledItem.label;
+                     break;
+                  }
+               }
             }
-            // semanticSegmentationTable[arrPos + 1] = deliminator;
             arrPos += 1;
          }
       }
+      this.labelCreationTime += DateTime.Now - startTime;
 
+      startTime = DateTime.Now;
       File.WriteAllBytes(trainingFolderLocation + "/" + id + "_labels.xxx", semanticSegmentationTable);
       File.Move(trainingFolderLocation + "/" + id + "_labels.xxx", trainingFolderLocation + "/" + id + "_labels.dat");
+      this.fileSavingTime += DateTime.Now - startTime;
    }
 
-   private void TakeScreenshot(Camera camera, int id)
+   private void TakeScreenshot(Camera camera, Guid id)
    {
+      var startTime = DateTime.Now;
       var width = camera.pixelWidth;
       var height = camera.pixelHeight;
       var filename = string.Format(trainingFolderLocation + id + "_" + camera.name + ".jpg");
@@ -136,15 +187,11 @@ public class GenerateTrainingData : MonoBehaviour {
       RenderTexture.active = null;
       camera.targetTexture = null;
       DestroyImmediate(rt);
+      this.screenShotTime += DateTime.Now - startTime;
 
+      startTime = DateTime.Now;
       System.IO.File.WriteAllBytes(filename, screenShot.EncodeToJPG());
       var bytes = screenShot.GetRawTextureData();
-      Debug.Log(string.Format("Took screenshot to: {0}", filename));
-      Debug.Log("Width: " + width + ", Height: " + height);
+      this.fileSavingTime += DateTime.Now - startTime;
    }
-	
-	// Update is called once per frame
-	void Update () {
-		
-	}
 }

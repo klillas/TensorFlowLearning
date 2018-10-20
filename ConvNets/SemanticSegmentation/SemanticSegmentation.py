@@ -43,6 +43,8 @@ class SemanticSegmentation:
 
     tf_model_saver = None
 
+    validation_data = None
+
     def initialize(
             self,
             data_generator: SemanticSegmentationTrainingDataLoader,
@@ -67,6 +69,8 @@ class SemanticSegmentation:
         self.hyper_param_save_model_interval_seconds = save_model_interval_seconds
         self.hyper_param_dropout_keep_prob = dropout_keep_prob
 
+        self.validation_data = self.data_generator.load_next_batch()
+
         self.session = tf.Session()
 
         if self.hyper_param_load_existing_model == False:
@@ -77,7 +81,7 @@ class SemanticSegmentation:
             self.tf_ph_image = tf.placeholder(tf.float32, (self.hyper_param_height, self.hyper_param_width, self.hyper_param_image_channels), name="image")
             self.tf_ph_learning_rate = tf.placeholder(tf.float32, shape=[], name="learning_rate")
             self.tf_variable_global_step = tf.Variable(0, trainable=False, name='global_step')
-            self.tf_variable_image = tf.Variable(np.zeros((30, self.hyper_param_height, self.hyper_param_width, self.hyper_param_image_channels)), name="variable_image")
+            self.tf_variable_image = tf.Variable(np.zeros((50, self.hyper_param_height, self.hyper_param_width, self.hyper_param_image_channels)), name="variable_image")
 
         if self.hyper_param_load_existing_model == True:
             loader_path = "./stored_models/"
@@ -96,7 +100,7 @@ class SemanticSegmentation:
             self.tf_variable_global_step = [v for v in tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES) if v.name == 'global_step:0'][0]
             self.tf_ph_learning_rate = self.tf_graph.get_tensor_by_name("learning_rate:0")
 
-        self.tf_summary_image_predictions = tf.summary.image("example prediction", self.tf_variable_image, 30)
+        self.tf_summary_image_predictions = tf.summary.image("example prediction", self.tf_variable_image, 50)
 
         self._initialize_model_minimal()
         self._initialize_cost()
@@ -186,40 +190,50 @@ class SemanticSegmentation:
 
     def _calculcate_and_log_statistics(self, cost_description, summary_writer, semantic_segmentation_data: SemanticSegmentationData, plotPrediction, calculate_cost):
         if calculate_cost == True:
-            prediction_batches = np.zeros(semantic_segmentation_data.labels.shape)
-            #cost_batches = np.zeros(semantic_segmentation_data.data_x.shape[0])
             cost_batches = []
+            semantic_segmentation_data = self.validation_data
             for j in range(semantic_segmentation_data.data_x.shape[0])[0::self.hyper_param_train_batch_size]:
                 # print("Calculating cost of example {}".format(j))
-                training_cost_item, batch_predictor = self.session.run([self.tf_tensor_cost, self.tf_tensor_predictor], feed_dict={
+                training_cost_item = self.session.run(self.tf_tensor_cost, feed_dict={
                     self.tf_ph_x: semantic_segmentation_data.data_x[j:j + self.hyper_param_train_batch_size],
                     self.tf_ph_labels_one_hot: semantic_segmentation_data.labels_one_hot[j:j + self.hyper_param_train_batch_size],
                     self.tf_ph_labels: semantic_segmentation_data.labels[j:j + self.hyper_param_train_batch_size],
                     self.tf_ph_droput_keep_prob: 1.0
                 })
                 cost_batches.append(training_cost_item)
-                prediction_batches[j:j + self.hyper_param_train_batch_size] = batch_predictor
 
             average_cost = np.mean(cost_batches)
 
             costs_summary = tf.Summary()
             costs_summary.value.add(tag="Cost", simple_value=average_cost)
             summary_writer.add_summary(costs_summary, tf.train.global_step(self.session, self.tf_variable_global_step))
-            print("Statistics for {}".format(cost_description))
-            print("Average cost = {}".format(average_cost))
-            #semantic_segmentation_data.exportImage("c:/temp/picture.jpg", 0, prediction_batches[0])
 
 
         if plotPrediction == True:
-            overlay_image = np.zeros((30, self.hyper_param_height, self.hyper_param_width, self.hyper_param_image_channels))
-            for i in range(30):
-                overlay_image[i] = semantic_segmentation_data.overlay_image_with_labels(i, np.reshape(prediction_batches[i], (self.hyper_param_height, self.hyper_param_width)))
+            # TODO: Make the amount of predictions user definable (All the static 50 assignments here and in the initializer
+            # TODO: This only works if the batch size is equal to 50 or evenly divisible, so have to fix that
+            prediction_batches = np.zeros((50, self.hyper_param_height * self.hyper_param_width))
+            overlay_image = np.zeros((50, self.hyper_param_height, self.hyper_param_width, self.hyper_param_image_channels))
+            for j in range(50)[0::self.hyper_param_train_batch_size]:
+                #semantic_segmentation_data = self.data_generator.load_next_batch()
+                semantic_segmentation_data = self.validation_data
+                batch_predictor = self.session.run(self.tf_tensor_predictor, feed_dict={
+                    self.tf_ph_x: semantic_segmentation_data.data_x,
+                    self.tf_ph_labels_one_hot: semantic_segmentation_data.labels_one_hot,
+                    self.tf_ph_labels: semantic_segmentation_data.labels,
+                    self.tf_ph_droput_keep_prob: 1.0
+                })
+                prediction_batches[j:j + self.hyper_param_train_batch_size] = batch_predictor
+                overlay_image[j:j + self.hyper_param_train_batch_size] = semantic_segmentation_data.data_x
+
+            for i in range(50):
+                overlay_image[i] = semantic_segmentation_data.overlay_image_with_labels(overlay_image[i], np.reshape(prediction_batches[i], (self.hyper_param_height, self.hyper_param_width)))
             self.tf_variable_image.load(overlay_image, self.session)
 
             image_summary = self.session.run(self.tf_summary_image_predictions)
             summary_writer.add_summary(image_summary, tf.train.global_step(self.session, self.tf_variable_global_step))
 
-            #for i in range(30):
+            #for i in range(50):
             #    overlay_image[i] = semantic_segmentation_data.overlay_image_with_labels(i, np.reshape(semantic_segmentation_data.labels[i], (self.hyper_param_height, self.hyper_param_width)))
             #self.tf_variable_image.load(overlay_image, session)
 
@@ -255,12 +269,64 @@ class SemanticSegmentation:
         if self.hyper_param_load_existing_model == False:
             model = tf.layers.conv2d(
                 inputs=self.tf_ph_x,
-                filters=4,
-                kernel_size=[2, 2],
+                filters=6,
+                kernel_size=[5, 5],
+                strides=1,
+                padding="same",
+                activation=tf.nn.relu
+            )
+
+            model = tf.layers.max_pooling2d(
+                inputs=model,
+                pool_size=[3, 3],
+                strides=2
+            )
+
+            model = tf.layers.conv2d(
+                inputs=model,
+                filters=16,
+                kernel_size=[5, 5],
+                strides=1,
                 padding="same",
                 activation=tf.nn.relu,
-                name="Layer1"
             )
+
+            model = tf.layers.max_pooling2d(
+                inputs=model,
+                pool_size=[3, 3],
+                strides=2
+            )
+
+            model = tf.layers.conv2d(
+                inputs=model,
+                filters=32,
+                kernel_size=[5, 5],
+                strides=1,
+                padding="same",
+                activation=tf.nn.relu,
+            )
+
+            model = tf.layers.max_pooling2d(
+                inputs=model,
+                pool_size=[3, 3],
+                strides=2
+            )
+
+            model = tf.layers.conv2d(
+                inputs=model,
+                filters=64,
+                kernel_size=[5, 5],
+                strides=1,
+                padding="same",
+                activation=tf.nn.relu,
+            )
+
+            model = tf.layers.max_pooling2d(
+                inputs=model,
+                pool_size=[3, 3],
+                strides=2
+            )
+
             #model_conv1_lowres = tf.layers.max_pooling2d(
             #    inputs=model,
             #    pool_size=[8, 8],
@@ -324,8 +390,7 @@ class SemanticSegmentation:
 
             model = tf.layers.dense(
                 inputs=model,
-                units=100,
-                name="Layer4"
+                units=150
             )
 
             #model = tf.layers.dense(
@@ -341,13 +406,12 @@ class SemanticSegmentation:
 
             model = tf.layers.dense(
                 inputs=model,
-                units=96*128,
-                name="Layer5"
+                units=48*64
             )
 
             model = tf.reshape(
                 model,
-                (-1, 96, 128, 1))
+                (-1, 48, 64, 1))
 
             model = tf.layers.conv2d_transpose(
                 model,

@@ -31,7 +31,7 @@ class SemanticSegmentationTrainingDataLoader:
         self.image_width = 256
         self.image_height = 192
         self.image_channels = 3
-        self.label_count = 2
+        self.label_count = 3
         self.training_set_ratio = 0.98
         self.batch_size = batch_size
         self.probability_delete_example = probability_delete_example
@@ -49,7 +49,7 @@ class SemanticSegmentationTrainingDataLoader:
         for i in range(self.batch_size):
             training_id = training_ids[i]
             dat_file = datFiles[training_id]
-            file_id = str(int(re.search(r'\d+', dat_file).group()))
+            file_id = re.search("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", dat_file).group()
 
             leftEyeImagePath = self.training_data_path + file_id + "_CameraLeftEye.jpg"
             rightEyeImagePath = self.training_data_path + file_id + "_CameraRightEye.jpg"
@@ -77,45 +77,3 @@ class SemanticSegmentationTrainingDataLoader:
 
         #data_x = data_x[shuffle_array]
         #labels = labels[shuffle_array]
-
-
-    def generate_traindata_from_depthvision_pictures(self):
-        trainingDataPath = "C:/temp/training/"
-        data_set_size = 15000
-        image_width = 256
-        image_height = 192
-        image_channels = 3
-        label_count = 2
-        training_set_ratio = 0.98
-        labels = np.zeros(shape=(data_set_size, image_height * image_width), dtype=np.uint8)
-        data_x = np.zeros(shape=(data_set_size, image_height, image_width, image_channels),dtype=np.uint8)
-        for i in range(data_set_size):
-            if i % 1000 == 0:
-                print("{} examples loaded".format(i))
-            leftEyeImage = misc.imread(trainingDataPath + str(i) + "_CameraLeftEye.jpg")
-            #rightEyeImage = misc.imread(trainingDataPath + str(i) + "_CameraRightEye.jpg")
-            #bothEyes = np.concatenate((leftEyeImage, rightEyeImage))
-            data_x[i] = leftEyeImage
-
-            # labels[i] = np.loadtxt(fname=trainingDataPath + str(i) + "_labels.dat", dtype=np.uint8).reshape((1, image_height, image_width))
-            labels[i] = np.fromfile(trainingDataPath + str(i) + "_labels.dat", dtype=np.uint8, count=image_height*image_width).reshape((1, image_height * image_width))
-
-        shuffle_array = np.arange(0, data_set_size)
-        np.random.shuffle(shuffle_array)
-
-        data_x = data_x[shuffle_array]
-        labels = labels[shuffle_array]
-
-        training_data_size = int(data_set_size * training_set_ratio)
-
-        semantic_segmentation_data_train = SemanticSegmentationData(
-            data_x[0:training_data_size],
-            labels[0:training_data_size],
-            label_count
-        )
-        semantic_segmentation_data_validation = SemanticSegmentationData(
-            data_x[training_data_size:data_set_size],
-            labels[training_data_size:data_set_size],
-            label_count
-        )
-        return semantic_segmentation_data_train, semantic_segmentation_data_validation, image_height, image_width, image_channels
