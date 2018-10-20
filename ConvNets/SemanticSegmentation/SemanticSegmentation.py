@@ -1,3 +1,5 @@
+import os
+#os.environ['TF_CPP_MIN_VLOG_LEVEL']='3'
 import tensorflow as tf
 import numpy as np
 from ConvNets.SemanticSegmentation import SemanticSegmentationData, SemanticSegmentationTrainingDataLoader
@@ -69,7 +71,11 @@ class SemanticSegmentation:
         self.hyper_param_save_model_interval_seconds = save_model_interval_seconds
         self.hyper_param_dropout_keep_prob = dropout_keep_prob
 
-        self.validation_data = self.data_generator.load_next_batch()
+        if load_existing_model == True:
+            # Old examples could have been used in training. Delete everything before loading the validation data batch
+            self.data_generator.delete_all_existing_training_data()
+
+        self.validation_data = self.data_generator.load_next_batch(delete_batch_source=True)
 
         self.session = tf.Session()
 

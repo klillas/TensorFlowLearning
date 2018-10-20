@@ -38,12 +38,24 @@ class SemanticSegmentationTrainingDataLoader:
         self._labels = np.zeros(shape=(self.batch_size, self.image_height * self.image_width), dtype=np.uint8)
         self._data_x = np.zeros(shape=(self.batch_size, self.image_height, self.image_width, self.image_channels), dtype=np.uint8)
 
+    def delete_all_existing_training_data(self):
+        datFiles = glob.glob(self.training_data_path + "*.dat")
+        jpgFiles = glob.glob(self.training_data_path + "*.jpg")
+        for datFile in datFiles:
+            if re.search("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", datFile) == None:
+                raise ValueError("Unexpected file to delete: {}".format(datFile))
+            os.remove(datFile)
 
-    def load_next_batch(self):
-        datFiles = glob.glob("c:/temp/training/*.dat")
+        for jpgFile in jpgFiles:
+            if re.search("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", jpgFile) == None:
+                raise ValueError("Unexpected file to delete: {}".format(jpgFile))
+            os.remove(jpgFile)
+
+    def load_next_batch(self, delete_batch_source = False):
+        datFiles = glob.glob(self.training_data_path + "*.dat")
         while len(datFiles) < 500:
             time.sleep(.500)
-            datFiles = glob.glob("c:/temp/training/*.dat")
+            datFiles = glob.glob(self.training_data_path + "*.dat")
 
         training_ids = np.random.choice(len(datFiles), self.batch_size, replace=False)
         for i in range(self.batch_size):
@@ -58,7 +70,7 @@ class SemanticSegmentationTrainingDataLoader:
             labelsPath = self.training_data_path + file_id + "_labels.dat"
             self._labels[i] = np.fromfile(labelsPath, dtype=np.uint8, count=self.image_height*self.image_width).reshape((1, self.image_height * self.image_width))
 
-            if random() < self.probability_delete_example:
+            if random() < self.probability_delete_example or delete_batch_source == True:
                 os.remove(leftEyeImagePath)
                 os.remove(rightEyeImagePath)
                 os.remove(labelsPath)

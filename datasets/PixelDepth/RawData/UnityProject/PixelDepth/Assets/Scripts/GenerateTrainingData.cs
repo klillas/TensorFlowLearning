@@ -7,6 +7,16 @@ public class GenerateTrainingData : MonoBehaviour {
    // Use this for initialization
    void Start()
    {
+      /*
+      int width = 512; // or something else
+      int height = 512; // or something else
+      bool isFullScreen = false; // should be windowed to run in arbitrary resolution
+      int desiredFPS = 60; // or something else
+      
+
+      Screen.SetResolution(width, height, isFullScreen, desiredFPS);
+      */
+
       var worker = new WorkerThread();
 
       worker.StartThread();
@@ -29,7 +39,7 @@ public class WorkerThread : MonoBehaviour
 
    string trainingFolderLocation = "c:/temp/training/";
    List<GameObject> visibleItems = new List<GameObject>();
-   List<LabelledItem> labelledItems;
+   Dictionary<int, LabelledItem> labelledItems;
    System.Random rand = new System.Random();
 
    TimeSpan sleepTime = new TimeSpan(0, 0, 0);
@@ -41,14 +51,14 @@ public class WorkerThread : MonoBehaviour
    // Use this for initialization
    public void StartThread()
    {
-      labelledItems = new List<LabelledItem>();
+      labelledItems = new Dictionary<int, LabelledItem>();
       for (int i = 0; i < 20; i++)
       {
          var labelledItem = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
          var collider = labelledItem.GetComponent<Collider>();
          Destroy(collider);
          labelledItem.AddComponent<MeshCollider>();
-         labelledItems.Add(new LabelledItem(labelledItem, 1));
+         labelledItems.Add(labelledItem.GetHashCode(), new LabelledItem(labelledItem, 1));
          visibleItems.Add(labelledItem);
       }
 
@@ -58,7 +68,7 @@ public class WorkerThread : MonoBehaviour
          var collider = labelledItem.GetComponent<Collider>();
          Destroy(collider);
          labelledItem.AddComponent<MeshCollider>();
-         labelledItems.Add(new LabelledItem(labelledItem, 2));
+         labelledItems.Add(labelledItem.GetHashCode(), new LabelledItem(labelledItem, 2));
          visibleItems.Add(labelledItem);
       }
 
@@ -72,42 +82,45 @@ public class WorkerThread : MonoBehaviour
          }
          sleepTime += DateTime.Now - now;
 
-         now = DateTime.Now;
-         foreach (var gameObject in visibleItems)
+         for (int i = 0; i < 500; i++)
          {
-            RandomlyPlaceObjectInCameraView(Camera.allCameras[0], gameObject);
-         }
-
-         foreach (var obj in visibleItems)
-         {
-            if (rand.NextDouble() < 0.5)
+            now = DateTime.Now;
+            foreach (var gameObject in visibleItems)
             {
-               obj.SetActive(false);
+               RandomlyPlaceObjectInCameraView(Camera.allCameras[0], gameObject);
             }
-            else
+
+            foreach (var obj in visibleItems)
             {
-               obj.SetActive(true);
+               if (rand.NextDouble() < 0.5)
+               {
+                  obj.SetActive(false);
+               }
+               else
+               {
+                  obj.SetActive(true);
+               }
             }
-         }
-         objectPlacementTime += DateTime.Now - now;
+            objectPlacementTime += DateTime.Now - now;
 
-         var guid = Guid.NewGuid();
-         foreach (var camera in Camera.allCameras)
-         {
-            TakeScreenshot(camera, guid);
-         }
+            var guid = Guid.NewGuid();
+            foreach (var camera in Camera.allCameras)
+            {
+               TakeScreenshot(camera, guid);
+            }
 
-         GenerateSemanticSegmentationTable(guid);
+            GenerateSemanticSegmentationTable(guid);
 
-         using (var tw = new StreamWriter(@"c:\temp\diagnostics.txt", false))
-         {
-            tw.WriteLine("Sleep time: " + this.sleepTime.TotalSeconds + " s");
-            tw.WriteLine("objectPlacementTime: " + this.objectPlacementTime.TotalSeconds + " s");
-            tw.WriteLine("labelCreationTime: " + this.labelCreationTime.TotalSeconds + " s");
-            tw.WriteLine("fileSavingTime: " + this.fileSavingTime.TotalSeconds + " s");
-            tw.WriteLine("screenShotTime: " + this.screenShotTime.TotalSeconds + " s");
-            tw.Flush();
-            tw.Close();
+            using (var tw = new StreamWriter(@"c:\temp\diagnostics.txt", false))
+            {
+               tw.WriteLine("Sleep time: " + this.sleepTime.TotalSeconds + " s");
+               tw.WriteLine("objectPlacementTime: " + this.objectPlacementTime.TotalSeconds + " s");
+               tw.WriteLine("labelCreationTime: " + this.labelCreationTime.TotalSeconds + " s");
+               tw.WriteLine("fileSavingTime: " + this.fileSavingTime.TotalSeconds + " s");
+               tw.WriteLine("screenShotTime: " + this.screenShotTime.TotalSeconds + " s");
+               tw.Flush();
+               tw.Close();
+            }
          }
       }
    }
@@ -147,13 +160,10 @@ public class WorkerThread : MonoBehaviour
             }
             else
             {
-               foreach (var labelledItem in labelledItems)
+               int hashCode = hit.collider.gameObject.GetHashCode();
+               if (labelledItems.ContainsKey(hashCode))
                {
-                  if (hit.collider.gameObject == labelledItem.gameObject)
-                  {
-                     semanticSegmentationTable[arrPos] = (byte)labelledItem.label;
-                     break;
-                  }
+                  semanticSegmentationTable[arrPos] = (byte)labelledItems[hashCode].label;
                }
             }
             arrPos += 1;
