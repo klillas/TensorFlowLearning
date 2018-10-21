@@ -64,7 +64,7 @@ class SemanticSegmentationTrainingDataLoader:
             file_id = re.search("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", dat_file).group()
 
             leftEyeImagePath = self.training_data_path + file_id + "_CameraLeftEye.jpg"
-            rightEyeImagePath = self.training_data_path + file_id + "_CameraRightEye.jpg"
+            #rightEyeImagePath = self.training_data_path + file_id + "_CameraRightEye.jpg"
             self._data_x[i] = misc.imread(leftEyeImagePath)
 
             labelsPath = self.training_data_path + file_id + "_labels.dat"
@@ -72,7 +72,7 @@ class SemanticSegmentationTrainingDataLoader:
 
             if random() < self.probability_delete_example or delete_batch_source == True:
                 os.remove(leftEyeImagePath)
-                os.remove(rightEyeImagePath)
+                #os.remove(rightEyeImagePath)
                 os.remove(labelsPath)
 
 

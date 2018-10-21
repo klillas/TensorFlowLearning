@@ -396,7 +396,8 @@ class SemanticSegmentation:
 
             model = tf.layers.dense(
                 inputs=model,
-                units=150
+                units=150,
+                name="Dense1"
             )
 
             #model = tf.layers.dense(
@@ -412,7 +413,8 @@ class SemanticSegmentation:
 
             model = tf.layers.dense(
                 inputs=model,
-                units=48*64
+                units=48*64,
+                name="Dense2"
             )
 
             model = tf.reshape(

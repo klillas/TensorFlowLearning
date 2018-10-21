@@ -2,29 +2,11 @@
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class GenerateTrainingData : MonoBehaviour {
-   // Use this for initialization
-   void Start()
-   {
-      /*
-      int width = 512; // or something else
-      int height = 512; // or something else
-      bool isFullScreen = false; // should be windowed to run in arbitrary resolution
-      int desiredFPS = 60; // or something else
-      
+   public GameObject ConsoleOutput;
 
-      Screen.SetResolution(width, height, isFullScreen, desiredFPS);
-      */
-
-      var worker = new WorkerThread();
-
-      worker.StartThread();
-   }
-}
-
-public class WorkerThread : MonoBehaviour
-{
    private class LabelledItem
    {
       public GameObject gameObject;
@@ -48,9 +30,18 @@ public class WorkerThread : MonoBehaviour
    TimeSpan fileSavingTime = new TimeSpan(0, 0, 0);
    TimeSpan screenShotTime = new TimeSpan(0, 0, 0);
 
-   // Use this for initialization
-   public void StartThread()
+   DateTime scriptStartTime = DateTime.Now;
+   int examplesGenerated = 0;
+
+   int width = 256; // or something else
+   int height = 192; // or something else
+
+   private void Start()
    {
+      bool isFullScreen = false; // should be windowed to run in arbitrary resolution
+      int desiredFPS = 60; // or something else
+      Screen.SetResolution(width, height, isFullScreen, desiredFPS);
+
       labelledItems = new Dictionary<int, LabelledItem>();
       for (int i = 0; i < 20; i++)
       {
@@ -71,18 +62,35 @@ public class WorkerThread : MonoBehaviour
          labelledItems.Add(labelledItem.GetHashCode(), new LabelledItem(labelledItem, 2));
          visibleItems.Add(labelledItem);
       }
+   }
+
+   void Update()
+   {
+      var timeUpdateStarted = DateTime.Now;
+      var currentWidth = Camera.allCameras[0].pixelWidth;
+      var currentHeight = Camera.allCameras[0].pixelHeight;
+      if (currentWidth != width || currentHeight != height)
+      {
+         // Attempt a fix for the next screen refresh
+         bool isFullScreen = false; // should be windowed to run in arbitrary resolution
+         int desiredFPS = 60; // or something else
+         Screen.SetResolution(width, height, isFullScreen, desiredFPS);
+
+         throw new NotSupportedException("Incorrect resolution on screen, cannot generate correct screenshots." +
+            currentWidth + "x" + currentHeight);
+      }
 
       var startTime = DateTime.Now;
-      while (true)
+      while (true && DateTime.Now - timeUpdateStarted < TimeSpan.FromMilliseconds(250))
       {
          var now = DateTime.Now;
-         while (Directory.GetFiles(trainingFolderLocation, "*.dat", SearchOption.TopDirectoryOnly).Length > 1000)
+         if (Directory.GetFiles(trainingFolderLocation, "*.dat", SearchOption.TopDirectoryOnly).Length > 1000)
          {
-            System.Threading.Thread.Sleep(500);
+            return;
          }
          sleepTime += DateTime.Now - now;
 
-         for (int i = 0; i < 500; i++)
+         for (int i = 0; i < 5; i++)
          {
             now = DateTime.Now;
             foreach (var gameObject in visibleItems)
@@ -111,16 +119,16 @@ public class WorkerThread : MonoBehaviour
 
             GenerateSemanticSegmentationTable(guid);
 
-            using (var tw = new StreamWriter(@"c:\temp\diagnostics.txt", false))
-            {
-               tw.WriteLine("Sleep time: " + this.sleepTime.TotalSeconds + " s");
-               tw.WriteLine("objectPlacementTime: " + this.objectPlacementTime.TotalSeconds + " s");
-               tw.WriteLine("labelCreationTime: " + this.labelCreationTime.TotalSeconds + " s");
-               tw.WriteLine("fileSavingTime: " + this.fileSavingTime.TotalSeconds + " s");
-               tw.WriteLine("screenShotTime: " + this.screenShotTime.TotalSeconds + " s");
-               tw.Flush();
-               tw.Close();
-            }
+            examplesGenerated++;
+
+            //var consoleText = this.ConsoleOutput.GetComponent<Text>();
+            //string text = "Sleep time: " + this.sleepTime.TotalSeconds + " s\r\n";
+            //text += "objectPlacementTime: " + this.objectPlacementTime.TotalSeconds + " s\r\n";
+            //text += "labelCreationTime: " + this.labelCreationTime.TotalSeconds + " s\r\n";
+            //text += "labelCreationTime: " + this.labelCreationTime.TotalSeconds + " s\r\n";
+            //text += "screenShotTime: " + this.screenShotTime.TotalSeconds + " s\r\n";
+            //string text = "Examples per second: " + this.examplesGenerated / (DateTime.Now - this.scriptStartTime).TotalSeconds;
+            //consoleText.text = text;
          }
       }
    }
@@ -196,12 +204,15 @@ public class WorkerThread : MonoBehaviour
 
       RenderTexture.active = null;
       camera.targetTexture = null;
-      DestroyImmediate(rt);
       this.screenShotTime += DateTime.Now - startTime;
 
       startTime = DateTime.Now;
       System.IO.File.WriteAllBytes(filename, screenShot.EncodeToJPG());
       var bytes = screenShot.GetRawTextureData();
       this.fileSavingTime += DateTime.Now - startTime;
+
+      Destroy(rt);
+      Destroy(screenShot);
    }
+
 }
