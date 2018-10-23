@@ -134,7 +134,7 @@ class SemanticSegmentation:
                 print("Training step {}".format(i))
             self.tf_variable_global_step.load(i, session=self.session)
             #####Train#####
-            #self.data_train.exportImageWithLabels("c:/temp/pic.jpg", 0,  np.reshape(self.data_train.labels[0], (self.hyper_param_height, self.hyper_param_width)))
+            #self.exportImageWithLabels("c:/temp/pic.jpg", 0,  np.reshape(self.data_train.labels[0], (self.hyper_param_height, self.hyper_param_width)))
 
             _ = self.session.run(self.tf_tensor_train, feed_dict={
                 self.tf_ph_x: data_train.data_x,
@@ -233,14 +233,14 @@ class SemanticSegmentation:
                 overlay_image[j:j + self.hyper_param_train_batch_size] = semantic_segmentation_data.data_x
 
             for i in range(50):
-                overlay_image[i] = semantic_segmentation_data.overlay_image_with_labels(overlay_image[i], np.reshape(prediction_batches[i], (self.hyper_param_height, self.hyper_param_width)))
+                overlay_image[i] = self._overlay_image_with_labels(overlay_image[i], np.reshape(prediction_batches[i], (self.hyper_param_height, self.hyper_param_width)))
             self.tf_variable_image.load(overlay_image, self.session)
 
             image_summary = self.session.run(self.tf_summary_image_predictions)
             summary_writer.add_summary(image_summary, tf.train.global_step(self.session, self.tf_variable_global_step))
 
             #for i in range(50):
-            #    overlay_image[i] = semantic_segmentation_data.overlay_image_with_labels(i, np.reshape(semantic_segmentation_data.labels[i], (self.hyper_param_height, self.hyper_param_width)))
+            #    overlay_image[i] = self._overlay_image_with_labels(i, np.reshape(semantic_segmentation_data.labels[i], (self.hyper_param_height, self.hyper_param_width)))
             #self.tf_variable_image.load(overlay_image, session)
 
             #image_summary = session.run(self.tf_summary_image_predictions)
@@ -460,14 +460,16 @@ class SemanticSegmentation:
 
         self._export_image_with_labels(path, image_data, np.reshape(prediction, (self.hyper_param_height, self.hyper_param_width)))
 
-        a = 5
-
     def _export_image_with_labels(self, path, image_data, predicted_labels):
         misc.imsave(path, self._overlay_image_with_labels(image_data, predicted_labels))
 
     def _overlay_image_with_labels(self, image_data, predicted_labels):
         color_mask = np.zeros((predicted_labels.shape[0], predicted_labels.shape[1], 3))
-        color_mask[np.where(predicted_labels == 1)] = [1, 0, 0]
+        color_mask[np.where(predicted_labels == 0)] = [232, 88, 35]
+        color_mask[np.where(predicted_labels == 1)] = [41, 48, 90]
+        color_mask[np.where(predicted_labels == 2)] = [246, 164, 3]
+        color_mask[np.where(predicted_labels == 3)] = [166, 169, 130]
+        color_mask[np.where(predicted_labels == 4)] = [96, 157, 186]
 
         alpha = 0.7
         # Convert the input image and color mask to Hue Saturation Value (HSV)

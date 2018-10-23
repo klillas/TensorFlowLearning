@@ -33,6 +33,8 @@ public class GenerateTrainingData : MonoBehaviour {
    DateTime scriptStartTime = DateTime.Now;
    int examplesGenerated = 0;
 
+   List<PrimitiveType> primitiveTypes;
+
    int width = 256; // or something else
    int height = 192; // or something else
 
@@ -42,24 +44,24 @@ public class GenerateTrainingData : MonoBehaviour {
       int desiredFPS = 60; // or something else
       Screen.SetResolution(width, height, isFullScreen, desiredFPS);
 
-      labelledItems = new Dictionary<int, LabelledItem>();
-      for (int i = 0; i < 20; i++)
+      primitiveTypes = new List<PrimitiveType>
       {
-         var labelledItem = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-         var collider = labelledItem.GetComponent<Collider>();
-         Destroy(collider);
-         labelledItem.AddComponent<MeshCollider>();
-         labelledItems.Add(labelledItem.GetHashCode(), new LabelledItem(labelledItem, 1));
-         visibleItems.Add(labelledItem);
-      }
+         PrimitiveType.Cylinder,
+         PrimitiveType.Capsule,
+         PrimitiveType.Cube,
+         PrimitiveType.Sphere
+      };
 
-      for (int i = 0; i < 20; i++)
+      labelledItems = new Dictionary<int, LabelledItem>();
+      for (int i = 0; i < 32; i++)
       {
-         var labelledItem = GameObject.CreatePrimitive(PrimitiveType.Quad);
+         int primitiveTypeId = i % primitiveTypes.Count + 1;
+         var primitiveType = primitiveTypes[primitiveTypeId - 1];
+         var labelledItem = GameObject.CreatePrimitive(primitiveType);
          var collider = labelledItem.GetComponent<Collider>();
          Destroy(collider);
          labelledItem.AddComponent<MeshCollider>();
-         labelledItems.Add(labelledItem.GetHashCode(), new LabelledItem(labelledItem, 2));
+         labelledItems.Add(labelledItem.GetHashCode(), new LabelledItem(labelledItem, primitiveTypeId));
          visibleItems.Add(labelledItem);
       }
    }
@@ -138,9 +140,18 @@ public class GenerateTrainingData : MonoBehaviour {
       float zPos = (float)(rand.NextDouble() * 10);
       float xPos = (float)(rand.NextDouble() * camera.pixelWidth);
       float yPos = (float)(rand.NextDouble() * camera.pixelHeight);
+
+      float xRot = (float)(rand.NextDouble() * 360);
+      float yRot = (float)(rand.NextDouble() * 360);
+      float zRot = (float)(rand.NextDouble() * 360);
       var screenPoint = new Vector3(xPos, yPos, zPos + 5);
       var worldPos = camera.ScreenToWorldPoint(screenPoint);
       gameObject.transform.position = worldPos;
+      gameObject.transform.eulerAngles = new Vector3(
+       xRot,
+       yRot,
+       zRot
+      );
    }
 
    private void GenerateSemanticSegmentationTable(Guid id)
