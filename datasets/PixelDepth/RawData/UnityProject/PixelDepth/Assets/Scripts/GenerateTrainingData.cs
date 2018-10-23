@@ -6,6 +6,7 @@ using UnityEngine.UI;
 
 public class GenerateTrainingData : MonoBehaviour {
    public GameObject ConsoleOutput;
+   public List<Material> Materials = new List<Material>();
 
    private class LabelledItem
    {
@@ -98,6 +99,7 @@ public class GenerateTrainingData : MonoBehaviour {
             foreach (var gameObject in visibleItems)
             {
                RandomlyPlaceObjectInCameraView(Camera.allCameras[0], gameObject);
+               RandomlyAssignMaterialsToObject(gameObject);
             }
 
             foreach (var obj in visibleItems)
@@ -152,6 +154,17 @@ public class GenerateTrainingData : MonoBehaviour {
        yRot,
        zRot
       );
+   }
+
+   void RandomlyAssignMaterialsToObject(GameObject gameObject)
+   {
+      int materialId = (int)(Materials.Count * rand.NextDouble());
+      // TODO: Well this is stupid, but it is late and I am too tired to figure out how to avoid it. I assume a math.floor will work but I don't want an exception thrown right now...
+      if (materialId == Materials.Count)
+      {
+         materialId--;
+      }
+      gameObject.GetComponent<Renderer>().material = Materials[materialId];
    }
 
    private void GenerateSemanticSegmentationTable(Guid id)

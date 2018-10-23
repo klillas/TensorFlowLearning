@@ -133,7 +133,7 @@ semantic_segmentation.initialize(
     #0.001, ==> Decreasing
     0.001,
     batch_size=training_data_generator.batch_size,
-    hyper_param_model_name="Model68",
+    hyper_param_model_name="Model69",
     load_existing_model=False,
     save_model_interval_seconds=900,
     dropout_keep_prob=1)
