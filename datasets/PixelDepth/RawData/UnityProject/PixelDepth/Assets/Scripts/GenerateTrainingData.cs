@@ -20,6 +20,7 @@ public class GenerateTrainingData : MonoBehaviour {
       }
    }
 
+   private GameObject[] Prefabs;
    string trainingFolderLocation = "c:/temp/training/";
    List<GameObject> visibleItems = new List<GameObject>();
    Dictionary<int, LabelledItem> labelledItems;
@@ -45,24 +46,44 @@ public class GenerateTrainingData : MonoBehaviour {
       int desiredFPS = 60; // or something else
       Screen.SetResolution(width, height, isFullScreen, desiredFPS);
 
+      Prefabs = Resources.LoadAll<GameObject>("Prefab/BigFurniturePack/Prefabs/");
+
       primitiveTypes = new List<PrimitiveType>
       {
-         PrimitiveType.Cylinder,
          PrimitiveType.Capsule,
          PrimitiveType.Cube,
-         PrimitiveType.Sphere
+         PrimitiveType.Cylinder
       };
 
       labelledItems = new Dictionary<int, LabelledItem>();
-      for (int i = 0; i < 32; i++)
+      for (int i = 0; i < primitiveTypes.Count; i++)
       {
-         int primitiveTypeId = i % primitiveTypes.Count + 1;
-         var primitiveType = primitiveTypes[primitiveTypeId - 1];
-         var labelledItem = GameObject.CreatePrimitive(primitiveType);
+         var item = GameObject.CreatePrimitive(primitiveTypes[i]);
+         var collider = item.GetComponent<Collider>();
+         Destroy(collider);
+         item.AddComponent<MeshCollider>();
+         labelledItems.Add(item.GetHashCode(), new LabelledItem(item, 0));
+         visibleItems.Add(item);
+      }
+
+      for (int i = 0; i < Prefabs.Length; i++)
+      {
+         var item = (GameObject)Instantiate(Prefabs[i], transform.position, transform.rotation);
+         //item.AddComponent<MeshRenderer>();
+         var collider = item.GetComponent<Collider>();
+         Destroy(collider);
+         item.AddComponent<MeshCollider>();
+         labelledItems.Add(item.GetHashCode(), new LabelledItem(item, 0));
+         visibleItems.Add(item);
+      }
+
+      for (int i = 0; i < 20; i++)
+      {
+         var labelledItem = GameObject.CreatePrimitive(PrimitiveType.Sphere);
          var collider = labelledItem.GetComponent<Collider>();
          Destroy(collider);
          labelledItem.AddComponent<MeshCollider>();
-         labelledItems.Add(labelledItem.GetHashCode(), new LabelledItem(labelledItem, primitiveTypeId));
+         labelledItems.Add(labelledItem.GetHashCode(), new LabelledItem(labelledItem, 1));
          visibleItems.Add(labelledItem);
       }
    }
@@ -100,6 +121,7 @@ public class GenerateTrainingData : MonoBehaviour {
             {
                RandomlyPlaceObjectInCameraView(Camera.allCameras[0], gameObject);
                RandomlyAssignMaterialsToObject(gameObject);
+               RandomlySetColorToObjectMaterial(gameObject);
             }
 
             foreach (var obj in visibleItems)
@@ -112,6 +134,11 @@ public class GenerateTrainingData : MonoBehaviour {
                {
                   obj.SetActive(true);
                }
+            }
+
+            foreach (var labelledItem in labelledItems.Values)
+            {
+               labelledItem.gameObject.SetActive(true);
             }
             objectPlacementTime += DateTime.Now - now;
 
@@ -158,13 +185,35 @@ public class GenerateTrainingData : MonoBehaviour {
 
    void RandomlyAssignMaterialsToObject(GameObject gameObject)
    {
-      int materialId = (int)(Materials.Count * rand.NextDouble());
-      // TODO: Well this is stupid, but it is late and I am too tired to figure out how to avoid it. I assume a math.floor will work but I don't want an exception thrown right now...
-      if (materialId == Materials.Count)
+      foreach (var renderer in gameObject.GetComponentsInChildren<Renderer>())
       {
-         materialId--;
+         int materialId = (int)(Materials.Count * rand.NextDouble());
+         // TODO: Well this is stupid, but it is late and I am too tired to figure out how to avoid it. I assume a math.floor will work but I don't want an exception thrown right now...
+         if (materialId == Materials.Count)
+         {
+            materialId--;
+         }
+
+         renderer.material = Materials[materialId];
       }
-      gameObject.GetComponent<Renderer>().material = Materials[materialId];
+   }
+
+   void RandomlySetColorToObjectMaterial(GameObject gameObject)
+   {
+      //Fetch the Renderer from the GameObject
+      foreach (var renderer in gameObject.GetComponentsInChildren<Renderer>())
+      {
+         var mainColor = new Color((float)rand.NextDouble(), (float)rand.NextDouble(), (float)rand.NextDouble());
+         var specularShaderColor = new Color((float)rand.NextDouble(), (float)rand.NextDouble(), (float)rand.NextDouble());
+
+         //Set the main Color of the Material to green
+         renderer.material.shader = Shader.Find("_Color");
+         renderer.material.SetColor("_Color", mainColor);
+
+         //Find the Specular shader and change its Color to red
+         renderer.material.shader = Shader.Find("Specular");
+         renderer.material.SetColor("_SpecColor", specularShaderColor);
+      }
    }
 
    private void GenerateSemanticSegmentationTable(Guid id)

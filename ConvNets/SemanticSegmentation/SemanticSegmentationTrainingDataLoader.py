@@ -31,7 +31,7 @@ class SemanticSegmentationTrainingDataLoader:
         self.image_width = 256
         self.image_height = 192
         self.image_channels = 3
-        self.label_count = 5
+        self.label_count = 2
         self.training_set_ratio = 0.98
         self.batch_size = batch_size
         self.probability_delete_example = probability_delete_example
