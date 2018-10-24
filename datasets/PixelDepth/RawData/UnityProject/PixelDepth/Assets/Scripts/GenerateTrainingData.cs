@@ -207,12 +207,13 @@ public class GenerateTrainingData : MonoBehaviour {
          var specularShaderColor = new Color((float)rand.NextDouble(), (float)rand.NextDouble(), (float)rand.NextDouble());
 
          //Set the main Color of the Material to green
-         renderer.material.shader = Shader.Find("_Color");
-         renderer.material.SetColor("_Color", mainColor);
+         //renderer.sharedMaterial.shader = Shader.Find("_Color");
+         renderer.sharedMaterial.SetColor("_Color", mainColor);
 
          //Find the Specular shader and change its Color to red
-         renderer.material.shader = Shader.Find("Specular");
-         renderer.material.SetColor("_SpecColor", specularShaderColor);
+         //renderer.sharedMaterial.shader = Shader.Find("Specular");
+         renderer.sharedMaterial.SetColor("_SpecColor", specularShaderColor);
+
       }
    }
 
