@@ -27,6 +27,7 @@ class SemanticSegmentation:
     tf_variable_image = None
 
     tf_summary_image_predictions = None
+    tf_summary_real_image_predictions = None
 
     tf_session = None
     tf_graph = None
@@ -107,6 +108,7 @@ class SemanticSegmentation:
             self.tf_ph_learning_rate = self.tf_graph.get_tensor_by_name("learning_rate:0")
 
         self.tf_summary_image_predictions = tf.summary.image("example prediction", self.tf_variable_image, 50)
+        self.tf_summary_real_image_predictions = tf.summary.image("real world prediction", self.tf_variable_image, self.data_generator.get_real_world_training_examples().shape[0])
 
         self._initialize_model_minimal()
         self._initialize_cost()
@@ -169,8 +171,8 @@ class SemanticSegmentation:
                     "Validation cost",
                     writer_validation,
                     data_validation,
-                    plotPrediction = True,
-                    calculate_cost = True
+                    plotPrediction=True,
+                    calculate_cost=True
                 )
 
                 writer_validation.flush()
@@ -193,6 +195,7 @@ class SemanticSegmentation:
                     save_path="./stored_models/" + self.hyper_param_model_name,
                     global_step=tf.train.global_step(self.session, self.tf_variable_global_step))
                 print("Model state saved")
+
 
     def _calculcate_and_log_statistics(self, cost_description, summary_writer, semantic_segmentation_data: SemanticSegmentationData, plotPrediction, calculate_cost):
         if calculate_cost == True:
@@ -221,7 +224,6 @@ class SemanticSegmentation:
             prediction_batches = np.zeros((50, self.hyper_param_height * self.hyper_param_width))
             overlay_image = np.zeros((50, self.hyper_param_height, self.hyper_param_width, self.hyper_param_image_channels))
             for j in range(50)[0::self.hyper_param_train_batch_size]:
-                #semantic_segmentation_data = self.data_generator.load_next_batch()
                 semantic_segmentation_data = self.validation_data
                 batch_predictor = self.session.run(self.tf_tensor_predictor, feed_dict={
                     self.tf_ph_x: semantic_segmentation_data.data_x,
@@ -239,12 +241,25 @@ class SemanticSegmentation:
             image_summary = self.session.run(self.tf_summary_image_predictions)
             summary_writer.add_summary(image_summary, tf.train.global_step(self.session, self.tf_variable_global_step))
 
-            #for i in range(50):
-            #    overlay_image[i] = self._overlay_image_with_labels(i, np.reshape(semantic_segmentation_data.labels[i], (self.hyper_param_height, self.hyper_param_width)))
-            #self.tf_variable_image.load(overlay_image, session)
 
-            #image_summary = session.run(self.tf_summary_image_predictions)
-            #summary_writer.add_summary(image_summary, tf.train.global_step(session, self.tf_variable_global_step))
+
+            # TODO: Make the amount of predictions user definable (All the static 50 assignments here and in the initializer
+            # TODO: This only works if the batch size is equal to 50 or evenly divisible, so have to fix that
+            real_world_examples = self.data_generator.get_real_world_training_examples()
+            overlay_image = np.zeros((50, self.hyper_param_height, self.hyper_param_width, self.hyper_param_image_channels))
+            for j in range(real_world_examples.shape[0]):
+                image_prediction = self.session.run(self.tf_tensor_predictor, feed_dict={
+                    self.tf_ph_x: np.reshape(real_world_examples[j], (1, self.hyper_param_height, self.hyper_param_width, self.hyper_param_image_channels)),
+                    self.tf_ph_labels: semantic_segmentation_data.labels,
+                    self.tf_ph_droput_keep_prob: 1.0
+                })
+                overlay_image[j] = self._overlay_image_with_labels(real_world_examples[j], np.reshape(image_prediction, (self.hyper_param_height, self.hyper_param_width)))
+
+            self.tf_variable_image.load(overlay_image, self.session)
+
+            image_summary = self.session.run(self.tf_summary_real_image_predictions)
+            summary_writer.add_summary(image_summary, tf.train.global_step(self.session, self.tf_variable_global_step))
+
         print("")
 
 
@@ -275,63 +290,63 @@ class SemanticSegmentation:
         if self.hyper_param_load_existing_model == False:
             model = tf.layers.conv2d(
                 inputs=self.tf_ph_x,
-                filters=6,
-                kernel_size=[5, 5],
+                filters=32,
+                kernel_size=[9, 9],
                 strides=1,
                 padding="same",
                 activation=tf.nn.relu
             )
 
-            model = tf.layers.max_pooling2d(
-                inputs=model,
-                pool_size=[3, 3],
-                strides=2
-            )
+            #model = tf.layers.max_pooling2d(
+            #    inputs=model,
+            #    pool_size=[3, 3],
+            #    strides=2
+            #)
 
             model = tf.layers.conv2d(
                 inputs=model,
-                filters=16,
-                kernel_size=[5, 5],
-                strides=1,
+                filters=128,
+                kernel_size=[9, 9],
+                strides=2,
                 padding="same",
                 activation=tf.nn.relu,
             )
 
-            model = tf.layers.max_pooling2d(
-                inputs=model,
-                pool_size=[3, 3],
-                strides=2
-            )
+            #model = tf.layers.max_pooling2d(
+            #    inputs=model,
+            #    pool_size=[3, 3],
+            #   strides=2
+            #)
 
             model = tf.layers.conv2d(
                 inputs=model,
-                filters=32,
-                kernel_size=[5, 5],
-                strides=1,
+                filters=128,
+                kernel_size=[9, 9],
+                strides=2,
                 padding="same",
                 activation=tf.nn.relu,
             )
 
-            model = tf.layers.max_pooling2d(
-                inputs=model,
-                pool_size=[3, 3],
-                strides=2
-            )
+            #model = tf.layers.max_pooling2d(
+            #    inputs=model,
+            #    pool_size=[3, 3],
+            #    strides=2
+            #)
 
             model = tf.layers.conv2d(
                 inputs=model,
-                filters=64,
-                kernel_size=[5, 5],
-                strides=1,
+                filters=128,
+                kernel_size=[9, 9],
+                strides=2,
                 padding="same",
                 activation=tf.nn.relu,
             )
 
-            model = tf.layers.max_pooling2d(
-                inputs=model,
-                pool_size=[3, 3],
-                strides=2
-            )
+            #model = tf.layers.max_pooling2d(
+            #    inputs=model,
+            #    pool_size=[3, 3],
+            #    strides=2
+            #)
 
             #model_conv1_lowres = tf.layers.max_pooling2d(
             #    inputs=model,

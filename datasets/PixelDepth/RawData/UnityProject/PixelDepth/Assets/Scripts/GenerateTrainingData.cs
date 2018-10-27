@@ -7,6 +7,9 @@ using UnityEngine.UI;
 public class GenerateTrainingData : MonoBehaviour {
    public GameObject ConsoleOutput;
    public List<Material> Materials = new List<Material>();
+   public List<GameObject> Lights = new List<GameObject>();
+   public GameObject BackWall;
+   public GameObject Floor;
 
    private class LabelledItem
    {
@@ -46,6 +49,22 @@ public class GenerateTrainingData : MonoBehaviour {
       int desiredFPS = 60; // or something else
       Screen.SetResolution(width, height, isFullScreen, desiredFPS);
 
+      for (int i = 0; i < 20; i++)
+      {
+         var go = new GameObject();
+         var light = go.AddComponent<Light>();
+         Lights.Add(go);
+      }
+
+      BackWall = GameObject.CreatePrimitive(PrimitiveType.Cube);
+      var collider = BackWall.GetComponent<Collider>();
+      Destroy(collider);
+      BackWall.AddComponent<MeshCollider>();
+      BackWall.transform.localScale = new Vector3(100, 100, 1);
+
+      //Floor = GameObject.CreatePrimitive(PrimitiveType.Cube);
+      //Floor.transform.localScale = new Vector3(100, 0.1f, 100);
+
       Prefabs = Resources.LoadAll<GameObject>("Prefab/BigFurniturePack/Prefabs/");
 
       primitiveTypes = new List<PrimitiveType>
@@ -59,7 +78,7 @@ public class GenerateTrainingData : MonoBehaviour {
       for (int i = 0; i < primitiveTypes.Count; i++)
       {
          var item = GameObject.CreatePrimitive(primitiveTypes[i]);
-         var collider = item.GetComponent<Collider>();
+         collider = item.GetComponent<Collider>();
          Destroy(collider);
          item.AddComponent<MeshCollider>();
          labelledItems.Add(item.GetHashCode(), new LabelledItem(item, 0));
@@ -70,7 +89,7 @@ public class GenerateTrainingData : MonoBehaviour {
       {
          var item = (GameObject)Instantiate(Prefabs[i], transform.position, transform.rotation);
          //item.AddComponent<MeshRenderer>();
-         var collider = item.GetComponent<Collider>();
+         collider = item.GetComponent<Collider>();
          Destroy(collider);
          item.AddComponent<MeshCollider>();
          labelledItems.Add(item.GetHashCode(), new LabelledItem(item, 0));
@@ -80,7 +99,7 @@ public class GenerateTrainingData : MonoBehaviour {
       for (int i = 0; i < 20; i++)
       {
          var labelledItem = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-         var collider = labelledItem.GetComponent<Collider>();
+         collider = labelledItem.GetComponent<Collider>();
          Destroy(collider);
          labelledItem.AddComponent<MeshCollider>();
          labelledItems.Add(labelledItem.GetHashCode(), new LabelledItem(labelledItem, 1));
@@ -117,29 +136,47 @@ public class GenerateTrainingData : MonoBehaviour {
          for (int i = 0; i < 5; i++)
          {
             now = DateTime.Now;
+            foreach (var light in Lights)
+            {
+               RandomlyPlaceObjectInCameraView(Camera.allCameras[0], light);
+               RandomlySetLightProperties(light);
+
+               if (rand.NextDouble() < 0.8)
+               {
+                  light.SetActive(false);
+               }
+               else
+               {
+                  light.SetActive(true);
+               }
+            }
+
             foreach (var gameObject in visibleItems)
             {
                RandomlyPlaceObjectInCameraView(Camera.allCameras[0], gameObject);
                RandomlyAssignMaterialsToObject(gameObject);
                RandomlySetColorToObjectMaterial(gameObject);
-            }
 
-            foreach (var obj in visibleItems)
-            {
-               if (rand.NextDouble() < 0.5)
+               if (rand.NextDouble() > 0.8)
                {
-                  obj.SetActive(false);
+                  gameObject.SetActive(true);
                }
                else
                {
-                  obj.SetActive(true);
+                  gameObject.SetActive(false);
                }
             }
 
+            RandomlyPlaceWalls();
+            RandomlyAssignMaterialsToObject(BackWall);
+            RandomlySetColorToObjectMaterial(BackWall);
+
+            /*
             foreach (var labelledItem in labelledItems.Values)
             {
                labelledItem.gameObject.SetActive(true);
             }
+            */
             objectPlacementTime += DateTime.Now - now;
 
             var guid = Guid.NewGuid();
@@ -207,14 +244,27 @@ public class GenerateTrainingData : MonoBehaviour {
          var specularShaderColor = new Color((float)rand.NextDouble(), (float)rand.NextDouble(), (float)rand.NextDouble());
 
          //Set the main Color of the Material to green
-         //renderer.sharedMaterial.shader = Shader.Find("_Color");
          renderer.sharedMaterial.SetColor("_Color", mainColor);
 
          //Find the Specular shader and change its Color to red
-         //renderer.sharedMaterial.shader = Shader.Find("Specular");
          renderer.sharedMaterial.SetColor("_SpecColor", specularShaderColor);
 
       }
+   }
+
+   void RandomlySetLightProperties(GameObject lightObject)
+   {
+      var lightComponent = lightObject.GetComponent<Light>();
+      lightComponent.intensity = (float) (rand.NextDouble() * 10 + 1);
+      lightComponent.range = (float)(rand.NextDouble() * 40 + 1);
+      var mainColor = new Color((float)rand.NextDouble(), (float)rand.NextDouble(), (float)rand.NextDouble());
+      lightComponent.color = mainColor;
+   }
+
+   void RandomlyPlaceWalls()
+   {
+      float zPos = (float)(rand.NextDouble() * 10 + 10);
+      BackWall.transform.position = new Vector3(0, 0, (float)zPos);
    }
 
    private void GenerateSemanticSegmentationTable(Guid id)
