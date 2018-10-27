@@ -480,13 +480,14 @@ class SemanticSegmentation:
 
     def _overlay_image_with_labels(self, image_data, predicted_labels):
         color_mask = np.zeros((predicted_labels.shape[0], predicted_labels.shape[1], 3))
-        color_mask[np.where(predicted_labels == 1)] = [41, 48, 90]
-        color_mask[np.where(predicted_labels == 2)] = [246, 164, 3]
-        color_mask[np.where(predicted_labels == 3)] = [166, 169, 130]
-        color_mask[np.where(predicted_labels == 4)] = [96, 157, 186]
-        color_mask[np.where(predicted_labels == 5)] = [232, 88, 35]
+        color_mask[np.where(predicted_labels == 1)] = [232, 88, 35]
+        color_mask[np.where(predicted_labels == 2)] = [41, 48, 90]
+        color_mask[np.where(predicted_labels == 3)] = [246, 164, 3]
+        color_mask[np.where(predicted_labels == 4)] = [166, 169, 130]
+        color_mask[np.where(predicted_labels == 5)] = [96, 157, 186]
 
-        alpha = 0.7
+
+        alpha = 0.8
         # Convert the input image and color mask to Hue Saturation Value (HSV)
         # colorspace
         img_hsv = color.rgb2hsv(image_data)

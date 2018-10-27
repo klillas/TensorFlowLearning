@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -167,6 +168,11 @@ public class GenerateTrainingData : MonoBehaviour {
                }
             }
 
+            foreach (var gameObject in labelledItems.Where(x => x.Value.label == 1))
+            {
+               RandomlyMutateObjectScale(gameObject.Value.gameObject);
+            }
+
             RandomlyPlaceWalls();
             RandomlyAssignMaterialsToObject(BackWall);
             RandomlySetColorToObjectMaterial(BackWall);
@@ -250,6 +256,16 @@ public class GenerateTrainingData : MonoBehaviour {
          renderer.sharedMaterial.SetColor("_SpecColor", specularShaderColor);
 
       }
+   }
+
+   void RandomlyMutateObjectScale(GameObject gameObject)
+   {
+      // TODO: This assume a default scale of 1. Fix it such that it knows the initial scale
+      float xScale = (float)(rand.NextDouble() * 0.1 + 1);
+      float yScale = (float)(rand.NextDouble() * 0.1 + 1);
+      float zScale = (float)(rand.NextDouble() * 0.1 + 1);
+
+      gameObject.transform.localScale = new Vector3(xScale, yScale, zScale);
    }
 
    void RandomlySetLightProperties(GameObject lightObject)
