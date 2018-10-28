@@ -43,6 +43,8 @@ class SemanticSegmentation:
     hyper_param_save_model_interval_seconds = None
     hyper_param_dropout_keep_prob = None
     hyper_param_epoch_start = None
+    hyper_param_validation_batch_size = None
+    hyper_param_validation_every_n_steps = None
 
     tf_model_saver = None
 
@@ -59,7 +61,9 @@ class SemanticSegmentation:
             hyper_param_model_name,
             load_existing_model,
             save_model_interval_seconds,
-            dropout_keep_prob):
+            dropout_keep_prob,
+            validation_batch_size,
+            validation_every_n_steps):
         self.data_generator = data_generator
         self.hyper_param_width = image_width
         self.hyper_param_height = image_height
@@ -71,12 +75,20 @@ class SemanticSegmentation:
         self.hyper_param_load_existing_model = load_existing_model
         self.hyper_param_save_model_interval_seconds = save_model_interval_seconds
         self.hyper_param_dropout_keep_prob = dropout_keep_prob
+        self.hyper_param_validation_batch_size = validation_batch_size
+        self.hyper_param_validation_every_n_steps = validation_every_n_steps
 
         if load_existing_model == True:
             # Old examples could have been used in training. Delete everything before loading the validation data batch
             self.data_generator.delete_all_existing_training_data()
 
-        self.validation_data = self.data_generator.load_next_batch(delete_batch_source=True)
+        if self.hyper_param_validation_batch_size % self.hyper_param_train_batch_size != 0:
+            raise ValueError("Train batch size must be evenly divisible with validation batch size")
+
+        #self.validation_data = np.zeros((self.hyper_param_validation_batch_size, self.hyper_param_height, self.hyper_param_width, self.hyper_param_image_channels))
+        self.validation_data = []
+        for batch_index in range(self.hyper_param_validation_batch_size)[0::self.hyper_param_train_batch_size]:
+            self.validation_data.append(self.data_generator.load_next_batch(delete_batch_source=True))
 
         self.session = tf.Session()
 
@@ -156,7 +168,7 @@ class SemanticSegmentation:
             costs_summary.value.add(tag="Cost", simple_value=batch_training_cost)
             writer_train.add_summary(costs_summary, tf.train.global_step(self.session, self.tf_variable_global_step))
 
-            if (i % 50 == 0):
+            if (i % self.hyper_param_validation_every_n_steps == 0):
                 # TODO: Just here now to avoid runtime error. Needs to use its separate batch of validation examples
                 data_validation = self.data_generator.load_next_batch()
                 print("")
@@ -201,12 +213,12 @@ class SemanticSegmentation:
         if calculate_cost == True:
             cost_batches = []
             semantic_segmentation_data = self.validation_data
-            for j in range(semantic_segmentation_data.data_x.shape[0])[0::self.hyper_param_train_batch_size]:
+            for j in range((int)(self.hyper_param_validation_batch_size / self.hyper_param_train_batch_size)):
                 # print("Calculating cost of example {}".format(j))
                 training_cost_item = self.session.run(self.tf_tensor_cost, feed_dict={
-                    self.tf_ph_x: semantic_segmentation_data.data_x[j:j + self.hyper_param_train_batch_size],
-                    self.tf_ph_labels_one_hot: semantic_segmentation_data.labels_one_hot[j:j + self.hyper_param_train_batch_size],
-                    self.tf_ph_labels: semantic_segmentation_data.labels[j:j + self.hyper_param_train_batch_size],
+                    self.tf_ph_x: semantic_segmentation_data[j].data_x,
+                    self.tf_ph_labels_one_hot: semantic_segmentation_data[j].labels_one_hot,
+                    self.tf_ph_labels: semantic_segmentation_data[j].labels,
                     self.tf_ph_droput_keep_prob: 1.0
                 })
                 cost_batches.append(training_cost_item)
@@ -224,11 +236,9 @@ class SemanticSegmentation:
             prediction_batches = np.zeros((50, self.hyper_param_height * self.hyper_param_width))
             overlay_image = np.zeros((50, self.hyper_param_height, self.hyper_param_width, self.hyper_param_image_channels))
             for j in range(50)[0::self.hyper_param_train_batch_size]:
-                semantic_segmentation_data = self.validation_data
+                semantic_segmentation_data = self.data_generator.load_next_batch(delete_batch_source=True)
                 batch_predictor = self.session.run(self.tf_tensor_predictor, feed_dict={
                     self.tf_ph_x: semantic_segmentation_data.data_x,
-                    self.tf_ph_labels_one_hot: semantic_segmentation_data.labels_one_hot,
-                    self.tf_ph_labels: semantic_segmentation_data.labels,
                     self.tf_ph_droput_keep_prob: 1.0
                 })
                 prediction_batches[j:j + self.hyper_param_train_batch_size] = batch_predictor
@@ -290,113 +300,123 @@ class SemanticSegmentation:
         if self.hyper_param_load_existing_model == False:
             model = tf.layers.conv2d(
                 inputs=self.tf_ph_x,
-                filters=32,
-                kernel_size=[9, 9],
+                filters=64,
+                kernel_size=[3, 3],
                 strides=1,
                 padding="same",
                 activation=tf.nn.relu
             )
 
-            #model = tf.layers.max_pooling2d(
-            #    inputs=model,
-            #    pool_size=[3, 3],
-            #    strides=2
-            #)
+            model = tf.layers.conv2d(
+                inputs=model,
+                filters=64,
+                kernel_size=[3, 3],
+                strides=1,
+                padding="same",
+                activation=tf.nn.relu
+            )
+
+            model = tf.layers.max_pooling2d(
+                inputs=model,
+                pool_size=[2, 2],
+                strides=2
+            )
 
             model = tf.layers.conv2d(
                 inputs=model,
                 filters=128,
-                kernel_size=[9, 9],
-                strides=2,
+                kernel_size=[3, 3],
+                strides=1,
                 padding="same",
-                activation=tf.nn.relu,
+                activation=tf.nn.relu
             )
-
-            #model = tf.layers.max_pooling2d(
-            #    inputs=model,
-            #    pool_size=[3, 3],
-            #   strides=2
-            #)
 
             model = tf.layers.conv2d(
                 inputs=model,
                 filters=128,
-                kernel_size=[9, 9],
-                strides=2,
+                kernel_size=[3, 3],
+                strides=1,
                 padding="same",
-                activation=tf.nn.relu,
+                activation=tf.nn.relu
             )
 
-            #model = tf.layers.max_pooling2d(
-            #    inputs=model,
-            #    pool_size=[3, 3],
-            #    strides=2
-            #)
+            model = tf.layers.max_pooling2d(
+                inputs=model,
+                pool_size=[2, 2],
+                strides=2
+            )
 
             model = tf.layers.conv2d(
                 inputs=model,
-                filters=128,
-                kernel_size=[9, 9],
-                strides=2,
+                filters=256,
+                kernel_size=[3, 3],
+                strides=1,
                 padding="same",
-                activation=tf.nn.relu,
+                activation=tf.nn.relu
             )
 
-            #model = tf.layers.max_pooling2d(
-            #    inputs=model,
-            #    pool_size=[3, 3],
-            #    strides=2
-            #)
+            model = tf.layers.conv2d(
+                inputs=model,
+                filters=256,
+                kernel_size=[3, 3],
+                strides=1,
+                padding="same",
+                activation=tf.nn.relu
+            )
 
-            #model_conv1_lowres = tf.layers.max_pooling2d(
-            #    inputs=model,
-            #    pool_size=[8, 8],
-            #    strides=8
-            #)
-            #model_conv1_lowres_flat = tf.reshape(model_conv1_lowres, (-1, model_conv1_lowres.shape[1] * model_conv1_lowres.shape[2] * model_conv1_lowres.shape[3]))
+            model = tf.layers.max_pooling2d(
+                inputs=model,
+                pool_size=[2, 2],
+                strides=2
+            )
 
-            #model = tf.layers.max_pooling2d(
-            #    inputs=model,
-            #    pool_size=[4, 4],
-            #    strides=4
-            #)
+            model = tf.layers.conv2d(
+                inputs=model,
+                filters=512,
+                kernel_size=[3, 3],
+                strides=1,
+                padding="same",
+                activation=tf.nn.relu
+            )
 
-            #model = tf.layers.conv2d(
-            #    inputs=model,
-            #    filters=8,
-            #    kernel_size=[4, 4],
-            #    padding="same",
-            #    activation=tf.nn.relu,
-            #    name="Layer2"
-            #)
+            model = tf.layers.conv2d(
+                inputs=model,
+                filters=512,
+                kernel_size=[3, 3],
+                strides=1,
+                padding="same",
+                activation=tf.nn.relu
+            )
 
-            #model_conv2_lowres = tf.layers.max_pooling2d(
-            #    inputs=model,
-            #    pool_size=[8, 8],
-            #    strides=8
-            #)
-            #model_conv2_lowres_flat = tf.reshape(model_conv2_lowres, (-1, model_conv2_lowres.shape[1] * model_conv2_lowres.shape[2] * model_conv2_lowres.shape[3]))
+            model = tf.layers.max_pooling2d(
+                inputs=model,
+                pool_size=[2, 2],
+                strides=2
+            )
 
-            #model = tf.layers.max_pooling2d(
-            #    inputs=model,
-            #    pool_size=[3, 3],
-            #    strides=3
-            #)
+            model = tf.layers.conv2d(
+                inputs=model,
+                filters=512,
+                kernel_size=[3, 3],
+                strides=1,
+                padding="same",
+                activation=tf.nn.relu
+            )
 
-            #model = tf.layers.conv2d(
-            #    inputs=model,
-            #    filters=32,
-            #    kernel_size=[2, 2],
-            #    padding="same",
-            #    activation=tf.nn.relu,
-            #    name="Layer3"
-            #)
+            model = tf.layers.conv2d(
+                inputs=model,
+                filters=512,
+                kernel_size=[3, 3],
+                strides=1,
+                padding="same",
+                activation=tf.nn.relu
+            )
 
-            #model = tf.layers.max_pooling2d(
-            #    inputs=model,
-            #    pool_size=[3, 3],
-            #    strides=3
-            #)
+            model = tf.layers.max_pooling2d(
+                inputs=model,
+                pool_size=[2, 2],
+                strides=2
+            )
 
             model = tf.reshape(
                 model,
@@ -411,15 +431,13 @@ class SemanticSegmentation:
 
             model = tf.layers.dense(
                 inputs=model,
-                units=150,
-                name="Dense1"
+                units=4096
             )
 
-            #model = tf.layers.dense(
-            #    inputs=model,
-            #    units=500,
-            #    name="Layerfdsa"
-            #)
+            model = tf.layers.dense(
+                inputs=model,
+                units=4096
+            )
 
             #model = tf.nn.dropout(
             #    model,

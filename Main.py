@@ -119,7 +119,7 @@ print("")
 print("Loading training data")
 training_data_generator = SemanticSegmentationTrainingDataLoader()
 training_data_generator.initialize(
-    batch_size=50,
+    batch_size=5,
     probability_delete_example=1.0)
 
 semantic_segmentation = SemanticSegmentation()
@@ -133,19 +133,21 @@ semantic_segmentation.initialize(
     #0.001, ==> Decreasing
     0.001,
     batch_size=training_data_generator.batch_size,
-    hyper_param_model_name="Model76",
+    hyper_param_model_name="Model78",
     load_existing_model=False,
     save_model_interval_seconds=900,
-    dropout_keep_prob=1)
+    dropout_keep_prob=1,
+    validation_batch_size=50,
+    validation_every_n_steps=200)
 
 #for i in range(5000, 5100):
     #picture_data = training_data_generator.load_picture_data("c:/temp/training/" + str(i) +"_CameraLeftEye.jpg")
     #semantic_segmentation.predict_and_create_image("c:/temp/pic" + str(i) + ".jpg", picture_data)
 
-picture_data = training_data_generator.load_picture_data("c:/temp/RealWorldBalls/20181026_193618 - 256x192.jpg")
-semantic_segmentation.predict_and_create_image("c:/temp/prediction.jpg", picture_data)
+#picture_data = training_data_generator.load_picture_data("c:/temp/RealWorldBalls/20181026_193618 - 256x192.jpg")
+#semantic_segmentation.predict_and_create_image("c:/temp/prediction.jpg", picture_data)
 
-picture_data = training_data_generator.load_picture_data("c:/temp/RealWorldBalls/20181026_193611 - 256x192.jpg")
-semantic_segmentation.predict_and_create_image("c:/temp/prediction.jpg", picture_data)
+#picture_data = training_data_generator.load_picture_data("c:/temp/RealWorldBalls/20181026_193611 - 256x192.jpg")
+#semantic_segmentation.predict_and_create_image("c:/temp/prediction.jpg", picture_data)
 
 semantic_segmentation.train_own_model()

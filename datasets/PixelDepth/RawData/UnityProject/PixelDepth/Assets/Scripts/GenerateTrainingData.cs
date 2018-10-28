@@ -97,7 +97,7 @@ public class GenerateTrainingData : MonoBehaviour {
          visibleItems.Add(item);
       }
 
-      for (int i = 0; i < 20; i++)
+      for (int i = 0; i < 50; i++)
       {
          var labelledItem = GameObject.CreatePrimitive(PrimitiveType.Sphere);
          collider = labelledItem.GetComponent<Collider>();
@@ -209,14 +209,15 @@ public class GenerateTrainingData : MonoBehaviour {
 
    void RandomlyPlaceObjectInCameraView(Camera camera, GameObject gameObject)
    {
-      float zPos = (float)(rand.NextDouble() * 10);
+      float zPos = (float)(rand.NextDouble() * 16);
       float xPos = (float)(rand.NextDouble() * camera.pixelWidth);
       float yPos = (float)(rand.NextDouble() * camera.pixelHeight);
 
       float xRot = (float)(rand.NextDouble() * 360);
       float yRot = (float)(rand.NextDouble() * 360);
       float zRot = (float)(rand.NextDouble() * 360);
-      var screenPoint = new Vector3(xPos, yPos, zPos + 5);
+
+      var screenPoint = new Vector3(xPos, yPos, zPos + 2);
       var worldPos = camera.ScreenToWorldPoint(screenPoint);
       gameObject.transform.position = worldPos;
       gameObject.transform.eulerAngles = new Vector3(
