@@ -66,7 +66,7 @@ public class GenerateTrainingData : MonoBehaviour {
       //Floor = GameObject.CreatePrimitive(PrimitiveType.Cube);
       //Floor.transform.localScale = new Vector3(100, 0.1f, 100);
 
-      Prefabs = Resources.LoadAll<GameObject>("Prefab/BigFurniturePack/Prefabs/");
+      Prefabs = Resources.LoadAll<GameObject>("Prefab/");
 
       primitiveTypes = new List<PrimitiveType>
       {
@@ -97,7 +97,7 @@ public class GenerateTrainingData : MonoBehaviour {
          visibleItems.Add(item);
       }
 
-      for (int i = 0; i < 50; i++)
+      for (int i = 0; i < 200; i++)
       {
          var labelledItem = GameObject.CreatePrimitive(PrimitiveType.Sphere);
          collider = labelledItem.GetComponent<Collider>();
@@ -139,7 +139,7 @@ public class GenerateTrainingData : MonoBehaviour {
             now = DateTime.Now;
             foreach (var light in Lights)
             {
-               RandomlyPlaceObjectInCameraView(Camera.allCameras[0], light);
+               RandomlyPlaceObjectInCameraView(Camera.allCameras[0], light, 1, 20, 3, 3);
                RandomlySetLightProperties(light);
 
                if (rand.NextDouble() < 0.8)
@@ -152,13 +152,21 @@ public class GenerateTrainingData : MonoBehaviour {
                }
             }
 
-            foreach (var gameObject in visibleItems)
+            foreach (var labelledItem in labelledItems)
             {
-               RandomlyPlaceObjectInCameraView(Camera.allCameras[0], gameObject);
+               var gameObject = labelledItem.Value.gameObject;
+               if (labelledItem.Value.label == 0)
+               {
+                  RandomlyPlaceObjectInCameraView(Camera.allCameras[0], gameObject, 2, 20, 1, 1);
+               }
+               else
+               {
+                  RandomlyPlaceObjectInCameraView(Camera.allCameras[0], gameObject, 1, 20, 1, 1);
+               }
                RandomlyAssignMaterialsToObject(gameObject);
                RandomlySetColorToObjectMaterial(gameObject);
 
-               if (rand.NextDouble() > 0.8)
+               if (rand.NextDouble() > 0.96)
                {
                   gameObject.SetActive(true);
                }
@@ -207,17 +215,26 @@ public class GenerateTrainingData : MonoBehaviour {
       }
    }
 
-   void RandomlyPlaceObjectInCameraView(Camera camera, GameObject gameObject)
+   /// <summary>
+   /// Randomly places and rotates object
+   /// </summary>
+   /// <param name="camera">The camera which is used as the view to place the objects</param>
+   /// <param name="gameObject">The object to place</param>
+   /// <param name="closestZ">The closest Z allowed in meters</param>
+   /// <param name="farthestZ">The furthest Z allowed in meters</param>
+   /// <param name="xPosMaxPos">The largest x position in camera width %. 1 is the exact width</param>
+   /// <param name="yPosMaxPos">The largest y position in camera height. 1 is the exact height </param>
+   void RandomlyPlaceObjectInCameraView(Camera camera, GameObject gameObject, float closestZ, float farthestZ, float xPosMaxPos, float yPosMaxPos)
    {
-      float zPos = (float)(rand.NextDouble() * 16);
-      float xPos = (float)(rand.NextDouble() * camera.pixelWidth);
-      float yPos = (float)(rand.NextDouble() * camera.pixelHeight);
+      float zPos = (float)(rand.NextDouble() * farthestZ);
+      float xPos = (float)(rand.NextDouble() * camera.pixelWidth * xPosMaxPos) - ((xPosMaxPos - 1f) * camera.pixelWidth * 0.5f);
+      float yPos = (float)(rand.NextDouble() * camera.pixelHeight * yPosMaxPos) - ((yPosMaxPos - 1f) * camera.pixelHeight * 0.5f);
 
       float xRot = (float)(rand.NextDouble() * 360);
       float yRot = (float)(rand.NextDouble() * 360);
       float zRot = (float)(rand.NextDouble() * 360);
 
-      var screenPoint = new Vector3(xPos, yPos, zPos + 2);
+      var screenPoint = new Vector3(xPos, yPos, zPos + closestZ);
       var worldPos = camera.ScreenToWorldPoint(screenPoint);
       gameObject.transform.position = worldPos;
       gameObject.transform.eulerAngles = new Vector3(

@@ -122,7 +122,8 @@ class SemanticSegmentation:
         self.tf_summary_image_predictions = tf.summary.image("example prediction", self.tf_variable_image, 50)
         self.tf_summary_real_image_predictions = tf.summary.image("real world prediction", self.tf_variable_image, self.data_generator.get_real_world_training_examples().shape[0])
 
-        self._initialize_model_minimal()
+        #self._initialize_model_minimal()
+        self._initialize_model_U_net()
         self._initialize_cost()
         self._initialize_optimization()
         self._initialize_predictor()
@@ -295,6 +296,71 @@ class SemanticSegmentation:
         if self.hyper_param_load_existing_model == True:
             self.tf_tensor_train = self.tf_graph.get_operation_by_name("fcn_train_op")
 
+    def _model_add_convolution(self, model, filter_multiplier=0, filter_size=0, kernel_size=[3, 3], strides=1):
+        model_filter_size = model.shape[3].value
+        new_filter_size = filter_size
+        if filter_multiplier != 0:
+            new_filter_size = int(model_filter_size * filter_multiplier)
+        model = tf.layers.conv2d(
+            inputs=model,
+            filters=new_filter_size,
+            kernel_size=kernel_size,
+            strides=strides,
+            padding="same",
+            activation=tf.nn.relu
+        )
+        return model
+
+    def _model_add_max_pooling(self, model, pool_size=[2, 2], strides=2):
+        model = tf.layers.max_pooling2d(
+            inputs=model,
+            pool_size=pool_size,
+            strides=strides
+        )
+        return model
+
+    def _model_add_deconvolution(self, model, size_multiplier):
+        model = tf.layers.conv2d_transpose(
+            model,
+            filters=model.shape[3],
+            strides=size_multiplier,
+            kernel_size=(size_multiplier, size_multiplier),
+            padding='same')
+        return model
+
+    def _initialize_model_U_net(self):
+        if self.hyper_param_load_existing_model == False:
+            model = tf.nn.dropout(self.tf_ph_x, keep_prob=self.tf_ph_droput_keep_prob)
+
+            model = self._model_add_convolution(model=model, filter_size=64)
+            model = self._model_add_convolution(model=model, filter_multiplier=1)
+            model = self._model_add_max_pooling(model=model)
+            model = tf.nn.dropout(model, keep_prob=self.tf_ph_droput_keep_prob)
+
+            model = self._model_add_convolution(model=model, filter_multiplier=2)
+            model = self._model_add_convolution(model=model, filter_multiplier=1)
+            model = self._model_add_max_pooling(model=model)
+            model = tf.nn.dropout(model, keep_prob=self.tf_ph_droput_keep_prob)
+
+            model = self._model_add_convolution(model=model, filter_multiplier=2)
+            model = self._model_add_convolution(model=model, filter_multiplier=1)
+
+            model = self._model_add_deconvolution(model=model, size_multiplier=2)
+            model = self._model_add_deconvolution(model=model, size_multiplier=2)
+
+            model = self._model_add_convolution(model=model, filter_multiplier=0.5)
+            model = self._model_add_convolution(model=model, filter_multiplier=0.5)
+            model = self._model_add_convolution(model=model, filter_multiplier=1)
+
+            model = self._model_add_convolution(model=model, filter_size=self.hyper_param_label_size)
+
+            model = tf.reshape(model, (-1, model.shape[1] * model.shape[2], self.hyper_param_label_size), name="fcn_logits")
+
+            self.tf_tensor_model = model
+
+        if self.hyper_param_load_existing_model == True:
+            self.tf_tensor_model = self.tf_graph.get_tensor_by_name("fcn_logits:0")
+
 
     def _initialize_model_minimal(self):
         if self.hyper_param_load_existing_model == False:
@@ -366,56 +432,8 @@ class SemanticSegmentation:
 
             model = tf.layers.max_pooling2d(
                 inputs=model,
-                pool_size=[2, 2],
-                strides=2
-            )
-
-            model = tf.layers.conv2d(
-                inputs=model,
-                filters=512,
-                kernel_size=[3, 3],
-                strides=1,
-                padding="same",
-                activation=tf.nn.relu
-            )
-
-            model = tf.layers.conv2d(
-                inputs=model,
-                filters=512,
-                kernel_size=[3, 3],
-                strides=1,
-                padding="same",
-                activation=tf.nn.relu
-            )
-
-            model = tf.layers.max_pooling2d(
-                inputs=model,
-                pool_size=[2, 2],
-                strides=2
-            )
-
-            model = tf.layers.conv2d(
-                inputs=model,
-                filters=512,
-                kernel_size=[3, 3],
-                strides=1,
-                padding="same",
-                activation=tf.nn.relu
-            )
-
-            model = tf.layers.conv2d(
-                inputs=model,
-                filters=512,
-                kernel_size=[3, 3],
-                strides=1,
-                padding="same",
-                activation=tf.nn.relu
-            )
-
-            model = tf.layers.max_pooling2d(
-                inputs=model,
-                pool_size=[2, 2],
-                strides=2
+                pool_size=[3, 3],
+                strides=3
             )
 
             model = tf.reshape(
@@ -431,12 +449,7 @@ class SemanticSegmentation:
 
             model = tf.layers.dense(
                 inputs=model,
-                units=4096
-            )
-
-            model = tf.layers.dense(
-                inputs=model,
-                units=4096
+                units=1024
             )
 
             #model = tf.nn.dropout(
@@ -457,10 +470,9 @@ class SemanticSegmentation:
             model = tf.layers.conv2d_transpose(
                 model,
                 filters=self.hyper_param_label_size,
-                kernel_size=16,
+                kernel_size=64,
                 strides=((int)(self.hyper_param_height / model.shape[1].value), (int)(self.hyper_param_width / model.shape[2].value)),
-                padding='SAME',
-                name="Layer6")
+                padding='SAME')
 
             model = tf.reshape(
                 model,
