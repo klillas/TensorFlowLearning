@@ -6,3 +6,8 @@
 /logs/Model67/validation
 /logs/
 /stored_models/*
+/ConvNets/ConvNetMNistSolver/__pycache__/CNNData.cpython-36.pyc
+/ConvNets/ConvNetMNistSolver/__pycache__/ConvNetMNistSolver.cpython-36.pyc
+/ConvNets/SemanticSegmentation/__pycache__/SemanticSegmentation.cpython-36.pyc
+/ConvNets/SemanticSegmentation/__pycache__/SemanticSegmentationData.cpython-36.pyc
+/ConvNets/SemanticSegmentation/__pycache__/SemanticSegmentationTrainingDataLoader.cpython-36.pyc

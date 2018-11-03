@@ -334,23 +334,32 @@ class SemanticSegmentation:
 
             model = self._model_add_convolution(model=model, filter_size=64)
             model = self._model_add_convolution(model=model, filter_multiplier=1)
+            output_layer1 = model;
             model = self._model_add_max_pooling(model=model)
             model = tf.nn.dropout(model, keep_prob=self.tf_ph_droput_keep_prob)
 
             model = self._model_add_convolution(model=model, filter_multiplier=2)
             model = self._model_add_convolution(model=model, filter_multiplier=1)
+            output_layer2 = model;
             model = self._model_add_max_pooling(model=model)
             model = tf.nn.dropout(model, keep_prob=self.tf_ph_droput_keep_prob)
 
             model = self._model_add_convolution(model=model, filter_multiplier=2)
             model = self._model_add_convolution(model=model, filter_multiplier=1)
 
-            model = self._model_add_deconvolution(model=model, size_multiplier=2)
-            model = self._model_add_deconvolution(model=model, size_multiplier=2)
 
+            ###########Deconvolution############
+            model = self._model_add_deconvolution(model=model, size_multiplier=2)
             model = self._model_add_convolution(model=model, filter_multiplier=0.5)
-            model = self._model_add_convolution(model=model, filter_multiplier=0.5)
+            model = tf.concat([model, output_layer2], axis=3)
             model = self._model_add_convolution(model=model, filter_multiplier=1)
+            model = self._model_add_convolution(model=model, filter_multiplier=0.5)
+
+            model = self._model_add_deconvolution(model=model, size_multiplier=2)
+            model = self._model_add_convolution(model=model, filter_multiplier=0.5)
+            model = tf.concat([model, output_layer1], axis=3)
+            model = self._model_add_convolution(model=model, filter_multiplier=1)
+            model = self._model_add_convolution(model=model, filter_multiplier=0.5)
 
             model = self._model_add_convolution(model=model, filter_size=self.hyper_param_label_size)
 

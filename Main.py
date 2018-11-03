@@ -119,8 +119,8 @@ print("")
 print("Loading training data")
 training_data_generator = SemanticSegmentationTrainingDataLoader()
 training_data_generator.initialize(
-    batch_size=10,
-    probability_delete_example=1.0)
+    batch_size=5,
+    probability_delete_example=0.7)
 
 semantic_segmentation = SemanticSegmentation()
 semantic_segmentation.initialize(
@@ -133,10 +133,10 @@ semantic_segmentation.initialize(
     #0.001, ==> Decreasing
     0.001,
     batch_size=training_data_generator.batch_size,
-    hyper_param_model_name="Model86",
-    load_existing_model=False,
+    hyper_param_model_name="Model88",
+    load_existing_model=True,
     save_model_interval_seconds=900,
-    dropout_keep_prob=0.98,
+    dropout_keep_prob=1.0,
     validation_batch_size=50,
     validation_every_n_steps=100)
 
