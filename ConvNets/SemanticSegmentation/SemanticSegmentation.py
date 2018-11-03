@@ -291,7 +291,7 @@ class SemanticSegmentation:
             loss_op = tf.reduce_mean(cross_entropy, name="fcn_loss")
 
             # The model implements this operation to find the weights/parameters that would yield correct pixel labels
-            self.tf_tensor_train = tf.train.AdamOptimizer(learning_rate=self.tf_ph_learning_rate).minimize(loss_op, name="fcn_train_op")
+            self.tf_tensor_train = tf.train.AdamOptimizer(learning_rate=self.hyper_param_learning_rate).minimize(loss_op, name="fcn_train_op")
 
         if self.hyper_param_load_existing_model == True:
             self.tf_tensor_train = self.tf_graph.get_operation_by_name("fcn_train_op")
@@ -332,17 +332,17 @@ class SemanticSegmentation:
         if self.hyper_param_load_existing_model == False:
             model = tf.nn.dropout(self.tf_ph_x, keep_prob=self.tf_ph_droput_keep_prob)
 
-            model = self._model_add_convolution(model=model, filter_size=64)
+            model = self._model_add_convolution(model=model, filter_size=16)
             model = self._model_add_convolution(model=model, filter_multiplier=1)
-            output_layer1 = model;
-            model = self._model_add_max_pooling(model=model)
-            model = tf.nn.dropout(model, keep_prob=self.tf_ph_droput_keep_prob)
+            output_layer1 = model
+            model = self._model_add_max_pooling(model=model, pool_size=[4, 4], strides=4)
+            #model = tf.nn.dropout(model, keep_prob=self.tf_ph_droput_keep_prob)
 
             model = self._model_add_convolution(model=model, filter_multiplier=2)
             model = self._model_add_convolution(model=model, filter_multiplier=1)
-            output_layer2 = model;
+            output_layer2 = model
             model = self._model_add_max_pooling(model=model)
-            model = tf.nn.dropout(model, keep_prob=self.tf_ph_droput_keep_prob)
+            #model = tf.nn.dropout(model, keep_prob=self.tf_ph_droput_keep_prob)
 
             model = self._model_add_convolution(model=model, filter_multiplier=2)
             model = self._model_add_convolution(model=model, filter_multiplier=1)
@@ -355,7 +355,7 @@ class SemanticSegmentation:
             model = self._model_add_convolution(model=model, filter_multiplier=1)
             model = self._model_add_convolution(model=model, filter_multiplier=0.5)
 
-            model = self._model_add_deconvolution(model=model, size_multiplier=2)
+            model = self._model_add_deconvolution(model=model, size_multiplier=4)
             model = self._model_add_convolution(model=model, filter_multiplier=0.5)
             model = tf.concat([model, output_layer1], axis=3)
             model = self._model_add_convolution(model=model, filter_multiplier=1)
