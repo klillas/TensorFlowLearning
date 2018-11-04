@@ -6,25 +6,33 @@ using UnityEngine;
 using UnityEngine.UI;
 
 public class GenerateTrainingData : MonoBehaviour {
+   public int maxExamples = 100000;
    public GameObject ConsoleOutput;
    public List<Material> Materials = new List<Material>();
    public List<GameObject> Lights = new List<GameObject>();
-   public GameObject BackWall;
-   public GameObject Floor;
+   public List<GameObject> ImportantBackgroundItems = new List<GameObject>();
 
-   private class LabelledItem
+   public class LabelledItem
    {
       public GameObject gameObject;
       public int label;
+      public float minZScale;
+      public float maxZScale;
+      public float spawnChance;
 
-      public LabelledItem(GameObject gameObject, int label)
+      public LabelledItem(GameObject gameObject, int label, float spawnChance = 0.1f, float minZScale = 0.9f, float maxZScale = 1.1f)
       {
          this.gameObject = gameObject;
          this.label = label;
+         this.minZScale = minZScale;
+         this.maxZScale = maxZScale;
+         this.spawnChance = spawnChance;
       }
    }
 
    private GameObject[] Prefabs;
+   private GameObject BackWall;
+   private GameObject Floor;
    string trainingFolderLocation = "c:/temp/training/";
    List<GameObject> visibleItems = new List<GameObject>();
    Dictionary<int, LabelledItem> labelledItems;
@@ -76,34 +84,90 @@ public class GenerateTrainingData : MonoBehaviour {
       };
 
       labelledItems = new Dictionary<int, LabelledItem>();
+
+      GenerateGeneralPrimitiveElements();
+      //GenerateBackgroundElements();
+      GenerateImportantBackgroundElements();
+      GenerateRealSpheres();
+      //GenerateFalseSpheres();
+   }
+
+   private void GenerateGeneralPrimitiveElements()
+   {
+      // General primitive elements. Not many and should have a higher chance of being included.
       for (int i = 0; i < primitiveTypes.Count; i++)
       {
          var item = GameObject.CreatePrimitive(primitiveTypes[i]);
-         collider = item.GetComponent<Collider>();
+         var collider = item.GetComponent<Collider>();
          Destroy(collider);
          item.AddComponent<MeshCollider>();
-         labelledItems.Add(item.GetHashCode(), new LabelledItem(item, 0));
+         labelledItems.Add(item.GetHashCode(), new LabelledItem(item, 0, 0.2f));
          visibleItems.Add(item);
       }
+   }
 
+   private void GenerateBackgroundElements()
+   {
+      // Generic background elements. Usually a large amount and should have a low probability of being included
       for (int i = 0; i < Prefabs.Length; i++)
       {
          var item = (GameObject)Instantiate(Prefabs[i], transform.position, transform.rotation);
-         //item.AddComponent<MeshRenderer>();
-         collider = item.GetComponent<Collider>();
+         var collider = item.GetComponent<Collider>();
          Destroy(collider);
          item.AddComponent<MeshCollider>();
-         labelledItems.Add(item.GetHashCode(), new LabelledItem(item, 0));
+         labelledItems.Add(item.GetHashCode(), new LabelledItem(item, 0, 0.04f));
          visibleItems.Add(item);
       }
+   }
 
-      for (int i = 0; i < 200; i++)
+   private void GenerateImportantBackgroundElements()
+   {
+      // Important background items which should be included often
+      foreach (var importantBackgroundItem in ImportantBackgroundItems)
+      {
+         var item = Instantiate(importantBackgroundItem, transform.position, transform.rotation);
+         var collider = item.GetComponent<Collider>();
+         Destroy(collider);
+         item.AddComponent<MeshCollider>();
+         labelledItems.Add(item.GetHashCode(), new LabelledItem(item, 0, 0.5f));
+         visibleItems.Add(item);
+      }
+   }
+
+   private void GenerateRealSpheres()
+   {
+      // "Real" spheres with a relatively low scale difference
+      for (int i = 0; i < 20; i++)
       {
          var labelledItem = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-         collider = labelledItem.GetComponent<Collider>();
+         var collider = labelledItem.GetComponent<Collider>();
          Destroy(collider);
          labelledItem.AddComponent<MeshCollider>();
-         labelledItems.Add(labelledItem.GetHashCode(), new LabelledItem(labelledItem, 1));
+         labelledItems.Add(labelledItem.GetHashCode(), new LabelledItem(labelledItem, 1, 0.5f));
+         visibleItems.Add(labelledItem);
+      }
+   }
+
+   private void GenerateFalseSpheres()
+   {
+      // "False" spheres with a very high scale difference in one axis
+      for (int i = 0; i < 20; i++)
+      {
+         var labelledItem = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+         var collider = labelledItem.GetComponent<Collider>();
+         Destroy(collider);
+         labelledItem.AddComponent<MeshCollider>();
+         labelledItems.Add(labelledItem.GetHashCode(), new LabelledItem(labelledItem, 0, 0.15f, 0.05f, 0.6f));
+         visibleItems.Add(labelledItem);
+      }
+
+      for (int i = 0; i < 20; i++)
+      {
+         var labelledItem = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+         var collider = labelledItem.GetComponent<Collider>();
+         Destroy(collider);
+         labelledItem.AddComponent<MeshCollider>();
+         labelledItems.Add(labelledItem.GetHashCode(), new LabelledItem(labelledItem, 0, 0.15f, 2.0f, 5.0f));
          visibleItems.Add(labelledItem);
       }
    }
@@ -128,7 +192,7 @@ public class GenerateTrainingData : MonoBehaviour {
       while (true && DateTime.Now - timeUpdateStarted < TimeSpan.FromMilliseconds(250))
       {
          var now = DateTime.Now;
-         if (Directory.GetFiles(trainingFolderLocation, "*.dat", SearchOption.TopDirectoryOnly).Length > 1000)
+         if (Directory.GetFiles(trainingFolderLocation, "*.dat", SearchOption.TopDirectoryOnly).Length > maxExamples)
          {
             return;
          }
@@ -166,7 +230,7 @@ public class GenerateTrainingData : MonoBehaviour {
                RandomlyAssignMaterialsToObject(gameObject);
                RandomlySetColorToObjectMaterial(gameObject);
 
-               if (rand.NextDouble() > 0.96)
+               if (rand.NextDouble() <= labelledItem.Value.spawnChance)
                {
                   gameObject.SetActive(true);
                }
@@ -176,9 +240,9 @@ public class GenerateTrainingData : MonoBehaviour {
                }
             }
 
-            foreach (var gameObject in labelledItems.Where(x => x.Value.label == 1))
+            foreach (var gameObject in labelledItems)
             {
-               RandomlyMutateObjectScale(gameObject.Value.gameObject);
+               RandomlyMutateObjectScale(gameObject.Value.gameObject, gameObject.Value.minZScale, gameObject.Value.maxZScale);
             }
 
             RandomlyPlaceWalls();
@@ -276,12 +340,13 @@ public class GenerateTrainingData : MonoBehaviour {
       }
    }
 
-   void RandomlyMutateObjectScale(GameObject gameObject)
+   void RandomlyMutateObjectScale(GameObject gameObject, float minZScale, float maxZScale)
    {
       // TODO: This assume a default scale of 1. Fix it such that it knows the initial scale
+      float zRange = maxZScale - minZScale;
       float xScale = (float)(rand.NextDouble() * 0.1 + 1);
       float yScale = (float)(rand.NextDouble() * 0.1 + 1);
-      float zScale = (float)(rand.NextDouble() * 0.1 + 1);
+      float zScale = (float)(rand.NextDouble() * zRange + minZScale);
 
       gameObject.transform.localScale = new Vector3(xScale, yScale, zScale);
    }
@@ -297,7 +362,7 @@ public class GenerateTrainingData : MonoBehaviour {
 
    void RandomlyPlaceWalls()
    {
-      float zPos = (float)(rand.NextDouble() * 10 + 10);
+      float zPos = (float)(rand.NextDouble() * 20 + 10);
       BackWall.transform.position = new Vector3(0, 0, (float)zPos);
    }
 

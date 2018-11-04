@@ -382,6 +382,11 @@
     <Compile Include="Packages\com.unity.package-manager-ui\Editor\Sources\UI\PackagesLoading.cs" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="Assets\Resources\Prefab\Downloaded\BeanBags\bag chair 2\archibase.net.txt" />
+    <None Include="Assets\Resources\Prefab\Downloaded\BeanBags\bag chair 3\archibase.net.txt" />
+    <None Include="Assets\Resources\Prefab\Downloaded\BeanBags\bag chair 4\archibase.net.txt" />
+    <None Include="Assets\Resources\Prefab\Downloaded\BeanBags\bag chair 5\archibase.net.txt" />
+    <None Include="Assets\Resources\Prefab\Downloaded\BeanBags\bag chair 6\archibase.net.txt" />
     <None Include="Assets\TextMesh Pro\Resources\LineBreaking Following Characters.txt" />
     <None Include="Assets\TextMesh Pro\Resources\LineBreaking Leading Characters.txt" />
     <None Include="Assets\TextMesh Pro\Resources\Shaders\TMP_Bitmap-Custom-Atlas.shader" />

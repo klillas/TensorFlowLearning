@@ -78,9 +78,10 @@ class SemanticSegmentation:
         self.hyper_param_validation_batch_size = validation_batch_size
         self.hyper_param_validation_every_n_steps = validation_every_n_steps
 
-        if load_existing_model == True:
+        #if load_existing_model == True:
             # Old examples could have been used in training. Delete everything before loading the validation data batch
-            self.data_generator.delete_all_existing_training_data()
+            # TODO: Refactor this to be a setting, because you do not always want to delete all examples even when loading an existing model
+            # self.data_generator.delete_all_existing_training_data()
 
         if self.hyper_param_validation_batch_size % self.hyper_param_train_batch_size != 0:
             raise ValueError("Train batch size must be evenly divisible with validation batch size")

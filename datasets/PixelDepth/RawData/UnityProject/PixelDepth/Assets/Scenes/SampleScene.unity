@@ -373,6 +373,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2151ddebc360a81459f0691ba8133c5b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  maxExamples: 50000
   ConsoleOutput: {fileID: 1819220492}
   Materials:
   - {fileID: 2100000, guid: d805d830c4023774cb6259aca09f431e, type: 2}
@@ -403,8 +404,14 @@ MonoBehaviour:
   - {fileID: 2100000, guid: 0c78d08393d68fe4584a24393e825e13, type: 2}
   - {fileID: 2100000, guid: 0ad2e8d2c7f13e249b9738772eb1151d, type: 2}
   Lights: []
-  BackWall: {fileID: 0}
-  Floor: {fileID: 0}
+  ImportantBackgroundItems:
+  - {fileID: 100000, guid: bee1a2be623b1df45905cb5e4758330d, type: 3}
+  - {fileID: 100000, guid: 3d215dff22426c7458db348ce3ac0509, type: 3}
+  - {fileID: 100000, guid: 41d4ea5d3fa5ffc4794af0c33af00484, type: 3}
+  - {fileID: 100000, guid: 74f861d2b74f8de4abb6dbaf9db52df7, type: 3}
+  - {fileID: 100000, guid: 3908d5eb5a8498448b340cfe0530cd2b, type: 3}
+  - {fileID: 100000, guid: 489a6bd9dcfb7cb44922f4eab316078a, type: 3}
+  - {fileID: 100000, guid: 0f6cdd38f51b17e4cafaa3420a7e2c3a, type: 3}
 --- !u!4 &1595546475
 Transform:
   m_ObjectHideFlags: 0

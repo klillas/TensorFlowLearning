@@ -19,6 +19,7 @@ class SemanticSegmentationTrainingDataLoader:
     training_set_ratio = None
     batch_size = None
     probability_delete_example = None
+    minimum_available_training_set_size = None
 
     _labels = None
     _data_x = None
@@ -41,6 +42,7 @@ class SemanticSegmentationTrainingDataLoader:
         self._labels = np.zeros(shape=(self.batch_size, self.image_height * self.image_width), dtype=np.uint8)
         self._data_x = np.zeros(shape=(self.batch_size, self.image_height, self.image_width, self.image_channels), dtype=np.uint8)
         self._load_real_world_training()
+        self.minimum_available_training_set_size = 10000
 
     def delete_all_existing_training_data(self):
         datFiles = glob.glob(self.training_data_path + "*.dat")
@@ -57,7 +59,7 @@ class SemanticSegmentationTrainingDataLoader:
 
     def load_next_batch(self, delete_batch_source=False):
         datFiles = glob.glob(self.training_data_path + "*.dat")
-        while len(datFiles) < 500:
+        while len(datFiles) < self.minimum_available_training_set_size:
             time.sleep(.500)
             datFiles = glob.glob(self.training_data_path + "*.dat")
 
