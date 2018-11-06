@@ -66,9 +66,8 @@ class SemanticSegmentationTrainingDataLoader:
             self.cached_datfiles = glob.glob(self.training_data_path + "*.dat")
             self.cached_datfiles_original_size = len(self.cached_datfiles)
 
-        training_ids = np.random.choice(len(self.cached_datfiles), self.batch_size, replace=False)
         for i in range(self.batch_size):
-            training_id = training_ids[i]
+            training_id = np.random.choice(len(self.cached_datfiles), 1, replace=False)
             self.last_batch_datfiles_indexes[i] = training_id
             dat_file = self.cached_datfiles[training_id]
             file_id = re.search("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", dat_file).group()
