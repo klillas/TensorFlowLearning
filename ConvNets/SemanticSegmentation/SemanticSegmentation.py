@@ -126,8 +126,8 @@ class SemanticSegmentation:
         self.tf_summary_real_image_predictions = tf.summary.image("real world prediction", self.tf_variable_image, self.data_generator.get_real_world_training_examples().shape[0])
 
         #self._initialize_model_minimal()
-        #self._initialize_model_U_net()
-        self._initialize_test_model()
+        self._initialize_model_U_net()
+        #self._initialize_test_model()
         self._initialize_cost()
         self._initialize_optimization()
         self._initialize_predictor()
@@ -146,8 +146,7 @@ class SemanticSegmentation:
         writer_validation = tf.summary.FileWriter("./logs/" + self.hyper_param_model_name + "/validation")
 
         train_cost_last_print = 0
-        #for i in range(self.session.run(self.tf_variable_global_step), 1000000):
-        for i in range(0, 50):
+        for i in range(self.session.run(self.tf_variable_global_step), 1000000):
             data_train = self.data_generator.load_next_batch()
             if i % 25 == 0:
                 print("Training step {}".format(i))
