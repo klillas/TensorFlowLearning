@@ -8,6 +8,8 @@ from datetime import timedelta
 from scipy import misc
 from skimage import data, color, io, img_as_float
 
+from memory_profiler import profile
+
 
 class SemanticSegmentation:
     data_generator = None
@@ -124,7 +126,8 @@ class SemanticSegmentation:
         self.tf_summary_real_image_predictions = tf.summary.image("real world prediction", self.tf_variable_image, self.data_generator.get_real_world_training_examples().shape[0])
 
         #self._initialize_model_minimal()
-        self._initialize_model_U_net()
+        #self._initialize_model_U_net()
+        self._initialize_test_model()
         self._initialize_cost()
         self._initialize_optimization()
         self._initialize_predictor()
@@ -132,7 +135,6 @@ class SemanticSegmentation:
         if self.hyper_param_load_existing_model == False:
             self.session.run(tf.global_variables_initializer())
         self.tf_model_saver = tf.train.Saver(max_to_keep=3, keep_checkpoint_every_n_hours=1)
-
 
     def train_own_model(self):
         summary_merged = tf.summary.merge_all()
@@ -144,7 +146,8 @@ class SemanticSegmentation:
         writer_validation = tf.summary.FileWriter("./logs/" + self.hyper_param_model_name + "/validation")
 
         train_cost_last_print = 0
-        for i in range(self.session.run(self.tf_variable_global_step), 1000000):
+        #for i in range(self.session.run(self.tf_variable_global_step), 1000000):
+        for i in range(0, 50):
             data_train = self.data_generator.load_next_batch()
             if i % 25 == 0:
                 print("Training step {}".format(i))
@@ -328,6 +331,16 @@ class SemanticSegmentation:
             kernel_size=(size_multiplier, size_multiplier),
             padding='same')
         return model
+
+    def _initialize_test_model(self):
+        model = self._model_add_convolution(model=self.tf_ph_x, filter_size=self.hyper_param_label_size)
+
+        model = tf.reshape(model, (-1, model.shape[1] * model.shape[2], self.hyper_param_label_size), name="fcn_logits")
+
+        self.tf_tensor_model = model
+
+
+
 
     def _initialize_model_U_net(self):
         if self.hyper_param_load_existing_model == False:

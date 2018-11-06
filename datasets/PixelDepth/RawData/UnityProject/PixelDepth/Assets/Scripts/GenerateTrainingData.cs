@@ -9,7 +9,7 @@ public class GenerateTrainingData : MonoBehaviour {
    public int maxExamples = 100000;
    public GameObject ConsoleOutput;
    public List<Material> Materials = new List<Material>();
-   public List<GameObject> Lights = new List<GameObject>();
+   public List<Flare> Flares = new List<Flare>();
    public List<GameObject> ImportantBackgroundItems = new List<GameObject>();
 
    public class LabelledItem
@@ -30,6 +30,7 @@ public class GenerateTrainingData : MonoBehaviour {
       }
    }
 
+   private List<GameObject> Lights = new List<GameObject>();
    private GameObject[] Prefabs;
    private GameObject BackWall;
    private GameObject Floor;
@@ -205,6 +206,7 @@ public class GenerateTrainingData : MonoBehaviour {
             {
                RandomlyPlaceObjectInCameraView(Camera.allCameras[0], light, 1, 20, 3, 3);
                RandomlySetLightProperties(light);
+               RandomlySetLightFlare(light);
 
                if (rand.NextDouble() < 0.8)
                {
@@ -358,6 +360,13 @@ public class GenerateTrainingData : MonoBehaviour {
       lightComponent.range = (float)(rand.NextDouble() * 40 + 1);
       var mainColor = new Color((float)rand.NextDouble(), (float)rand.NextDouble(), (float)rand.NextDouble());
       lightComponent.color = mainColor;
+   }
+
+   void RandomlySetLightFlare(GameObject lightObject)
+   {
+      var lightComponent = lightObject.GetComponent<Light>();
+
+      lightComponent.flare = Flares[rand.Next(0, Flares.Count())];
    }
 
    void RandomlyPlaceWalls()
