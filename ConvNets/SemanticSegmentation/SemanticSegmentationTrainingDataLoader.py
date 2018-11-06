@@ -67,7 +67,7 @@ class SemanticSegmentationTrainingDataLoader:
             self.cached_datfiles_original_size = len(self.cached_datfiles)
 
         for i in range(self.batch_size):
-            training_id = np.random.choice(len(self.cached_datfiles), 1, replace=False)
+            training_id = np.random.choice(len(self.cached_datfiles), 1, replace=False)[0]
             self.last_batch_datfiles_indexes[i] = training_id
             dat_file = self.cached_datfiles[training_id]
             file_id = re.search("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", dat_file).group()
@@ -77,7 +77,7 @@ class SemanticSegmentationTrainingDataLoader:
 
             labelsPath = self.training_data_path + file_id + "_labels.dat"
             self._labels[i] = np.fromfile(labelsPath, dtype=np.uint8, count=self.image_height*self.image_width).reshape((1, self.image_height * self.image_width))
-
+            # TODO: This is guaranteed to mess up the indexes in self.last_batch_datfiles_indexes. Fix!
             if random() < self.probability_delete_example:
                 self._delete_training_data(training_id)
 
