@@ -37,7 +37,7 @@ class SemanticSegmentationTrainingDataLoader:
         picture_data = misc.imread(file_path)
         return picture_data
 
-    def initialize(self, batch_size, probability_delete_example):
+    def initialize(self, batch_size, probability_delete_example, minimum_available_training_set_size):
         self.training_data_path = "C:\\temp\\training\\"
         self.real_world_test_path = "C:\\temp\\RealWorldTest\\"
         self.image_width = 256
@@ -50,7 +50,7 @@ class SemanticSegmentationTrainingDataLoader:
         self._labels = np.zeros(shape=(self.batch_size, self.image_height * self.image_width), dtype=np.uint8)
         self._data_x = np.zeros(shape=(self.batch_size, self.image_height, self.image_width, self.image_channels), dtype=np.uint8)
         self._load_real_world_training()
-        self.minimum_available_training_set_size = 10000
+        self.minimum_available_training_set_size = minimum_available_training_set_size
         self.cached_datfiles = glob.glob(self.training_data_path + "*.dat")
         self.cached_datfiles_original_size = len(self.cached_datfiles)
         self.last_batch_datfiles_indexes = np.zeros(shape=self.batch_size, dtype=np.int)
@@ -120,9 +120,10 @@ class SemanticSegmentationTrainingDataLoader:
             time.sleep(.001)
 
         semantic_segmentation_data = self.cached_semantic_segmentation_data
-        if delete_batch_source:
-            for dat_index in self.last_batch_datfiles_indexes:
-                self._delete_training_data(dat_index)
+        #if delete_batch_source:
+            #for dat_index in self.last_batch_datfiles_indexes:
+                # TODO: because of an earlier todo in this file, this needs to be commented out for the time being... Will impact the validation cost calculation slightly, but with 100 000 training data size it should not be so bad.
+                # self._delete_training_data(dat_index)
 
         self.asynch_load_next_batch_thread = threading.Thread(name='daemon', target=self._asynch_load_next_batch)
         self.asynch_load_next_batch_thread.setDaemon(True)

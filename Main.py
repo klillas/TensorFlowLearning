@@ -117,8 +117,9 @@ print("")
 print("Loading training data")
 training_data_generator = SemanticSegmentationTrainingDataLoader()
 training_data_generator.initialize(
-    batch_size=50,
-    probability_delete_example=0.3)
+    batch_size=5,
+    probability_delete_example=0.0,
+    minimum_available_training_set_size=1)
 
 semantic_segmentation = SemanticSegmentation()
 semantic_segmentation.initialize(
@@ -129,14 +130,14 @@ semantic_segmentation.initialize(
     #0.0001, ==> Slowly decreasing
     #0.03, ==> Slowly increasing
     #0.001, ==> Decreasing
-    0.003,
+    0.0001,
     batch_size=training_data_generator.batch_size,
-    hyper_param_model_name="TraingRate 0.003 Batchsize 50",
+    hyper_param_model_name="BallFinder_02",
     load_existing_model=False,
-    save_model_interval_seconds=900,
+    save_model_interval_seconds=120,
     dropout_keep_prob=1.0,
     validation_batch_size=50,
-    validation_every_n_steps=100)
+    validation_every_n_steps=1000)
 
 #for i in range(5000, 5100):
     #picture_data = training_data_generator.load_picture_data("c:/temp/training/" + str(i) +"_CameraLeftEye.jpg")

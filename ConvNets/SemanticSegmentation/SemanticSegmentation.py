@@ -7,6 +7,7 @@ from datetime import datetime
 from datetime import timedelta
 from scipy import misc
 from skimage import data, color, io, img_as_float
+import sys
 
 from memory_profiler import profile
 
@@ -27,6 +28,7 @@ class SemanticSegmentation:
 
     tf_variable_global_step = None
     tf_variable_image = None
+    tf_variable_best_cost = None
 
     tf_summary_image_predictions = None
     tf_summary_real_image_predictions = None
@@ -103,6 +105,7 @@ class SemanticSegmentation:
             self.tf_ph_image = tf.placeholder(tf.float32, (self.hyper_param_height, self.hyper_param_width, self.hyper_param_image_channels), name="image")
             self.tf_ph_learning_rate = tf.placeholder(tf.float32, shape=[], name="learning_rate")
             self.tf_variable_global_step = tf.Variable(0, trainable=False, name='global_step')
+            self.tf_variable_best_cost = tf.Variable(sys.float_info.max, trainable=False, name='best_cost')
             self.tf_variable_image = tf.Variable(np.zeros((50, self.hyper_param_height, self.hyper_param_width, self.hyper_param_image_channels)), name="variable_image")
 
         if self.hyper_param_load_existing_model == True:
@@ -120,6 +123,7 @@ class SemanticSegmentation:
             self.tf_ph_droput_keep_prob = self.tf_graph.get_tensor_by_name("dropout_keep_prob:0")
             self.tf_ph_image = self.tf_graph.get_tensor_by_name("image:0")
             self.tf_variable_global_step = [v for v in tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES) if v.name == 'global_step:0'][0]
+            self.tf_variable_best_cost = [v for v in tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES) if v.name == 'best_cost:0'][0]
             self.tf_ph_learning_rate = self.tf_graph.get_tensor_by_name("learning_rate:0")
 
         self.tf_summary_image_predictions = tf.summary.image("example prediction", self.tf_variable_image, 50)
@@ -146,7 +150,7 @@ class SemanticSegmentation:
         writer_validation = tf.summary.FileWriter("./logs/" + self.hyper_param_model_name + "/validation")
 
         train_cost_last_print = 0
-        for i in range(self.session.run(self.tf_variable_global_step), 1000000):
+        for i in range(self.session.run(self.tf_variable_global_step), 100000000):
             data_train = self.data_generator.load_next_batch()
             if i % 25 == 0:
                 print("Training step {}".format(i))
@@ -204,13 +208,15 @@ class SemanticSegmentation:
             #    )
             #    writer_train.flush()
 
-            if datetime.now() > (time_model_last_saved + timedelta(seconds=self.hyper_param_save_model_interval_seconds)):
+            if datetime.now() > (time_model_last_saved + timedelta(seconds=self.hyper_param_save_model_interval_seconds)) \
+                    and batch_training_cost < self.session.run(self.tf_variable_best_cost):
                 time_model_last_saved = datetime.now()
+                self.tf_variable_best_cost.load(batch_training_cost, session=self.session)
                 self.tf_model_saver.save(
                     sess=self.session,
                     save_path="./stored_models/" + self.hyper_param_model_name,
                     global_step=tf.train.global_step(self.session, self.tf_variable_global_step))
-                print("Model state saved")
+                print("New lowest cost found, model state saved")
 
 
     def _calculcate_and_log_statistics(self, cost_description, summary_writer, semantic_segmentation_data: SemanticSegmentationData, plotPrediction, calculate_cost):
@@ -345,7 +351,7 @@ class SemanticSegmentation:
         if self.hyper_param_load_existing_model == False:
             model = tf.nn.dropout(self.tf_ph_x, keep_prob=self.tf_ph_droput_keep_prob)
 
-            model = self._model_add_convolution(model=model, filter_size=16)
+            model = self._model_add_convolution(model=model, filter_size=4)
             model = self._model_add_convolution(model=model, filter_multiplier=1)
             output_layer1 = model
             model = self._model_add_max_pooling(model=model, pool_size=[4, 4], strides=4)

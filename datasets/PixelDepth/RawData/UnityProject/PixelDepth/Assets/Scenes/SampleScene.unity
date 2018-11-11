@@ -381,7 +381,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2151ddebc360a81459f0691ba8133c5b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  maxExamples: 100000
+  maxExamples: 1000000
   ConsoleOutput: {fileID: 1819220492}
   Materials:
   - {fileID: 2100000, guid: d805d830c4023774cb6259aca09f431e, type: 2}

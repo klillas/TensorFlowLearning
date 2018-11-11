@@ -34,7 +34,7 @@ public class GenerateTrainingData : MonoBehaviour {
    private GameObject[] Prefabs;
    private GameObject BackWall;
    private GameObject Floor;
-   string trainingFolderLocation = "c:/temp/training/";
+   string trainingFolderLocation = "g:/temp/training/";
    List<GameObject> visibleItems = new List<GameObject>();
    Dictionary<int, LabelledItem> labelledItems;
    System.Random rand = new System.Random();
@@ -87,7 +87,7 @@ public class GenerateTrainingData : MonoBehaviour {
       labelledItems = new Dictionary<int, LabelledItem>();
 
       GenerateGeneralPrimitiveElements();
-      //GenerateBackgroundElements();
+      GenerateBackgroundElements();
       GenerateImportantBackgroundElements();
       GenerateRealSpheres();
       //GenerateFalseSpheres();
