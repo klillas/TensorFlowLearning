@@ -1,4 +1,5 @@
 import threading
+import queue
 
 from scipy import misc
 import numpy as np
@@ -25,12 +26,8 @@ class SemanticSegmentationTrainingDataLoader:
 
     cached_datfiles = None
     cached_datfiles_original_size = None
-    asynch_load_next_batch_thread = None
-    cached_semantic_segmentation_data = None
-    last_batch_datfiles_indexes = None
+    batch_queue = None
 
-    _labels = None
-    _data_x = None
     _real_world_examples = None
 
     def load_picture_data(self, file_path):
@@ -47,46 +44,60 @@ class SemanticSegmentationTrainingDataLoader:
         self.training_set_ratio = 0.98
         self.batch_size = batch_size
         self.probability_delete_example = probability_delete_example
-        self._labels = np.zeros(shape=(self.batch_size, self.image_height * self.image_width), dtype=np.uint8)
-        self._data_x = np.zeros(shape=(self.batch_size, self.image_height, self.image_width, self.image_channels), dtype=np.uint8)
         self._load_real_world_training()
         self.minimum_available_training_set_size = minimum_available_training_set_size
         self.cached_datfiles = glob.glob(self.training_data_path + "*.dat")
         self.cached_datfiles_original_size = len(self.cached_datfiles)
-        self.last_batch_datfiles_indexes = np.zeros(shape=self.batch_size, dtype=np.int)
+        self.batch_queue = queue.Queue()
 
-        self.asynch_load_next_batch_thread = threading.Thread(name='daemon', target=self._asynch_load_next_batch)
-        self.asynch_load_next_batch_thread.setDaemon(True)
-        self.asynch_load_next_batch_thread.start()
+        asynch_load_next_batch_thread = threading.Thread(name='daemon', target=self._asynch_load_next_batch)
+        asynch_load_next_batch_thread.setDaemon(True)
+        asynch_load_next_batch_thread.start()
+
+        asynch_load_next_batch_thread = threading.Thread(name='daemon', target=self._asynch_load_next_batch)
+        asynch_load_next_batch_thread.setDaemon(True)
+        asynch_load_next_batch_thread.start()
+
+        asynch_load_next_batch_thread = threading.Thread(name='daemon', target=self._asynch_load_next_batch)
+        asynch_load_next_batch_thread.setDaemon(True)
+        asynch_load_next_batch_thread.start()
+
+        asynch_load_next_batch_thread = threading.Thread(name='daemon', target=self._asynch_load_next_batch)
+        asynch_load_next_batch_thread.setDaemon(True)
+        asynch_load_next_batch_thread.start()
 
     def _asynch_load_next_batch(self):
-        self.cached_semantic_segmentation_data = None
-        while len(self.cached_datfiles) < self.minimum_available_training_set_size or len(self.cached_datfiles) / self.cached_datfiles_original_size < 0.8:
-            time.sleep(.500)
-            self.cached_datfiles = glob.glob(self.training_data_path + "*.dat")
-            self.cached_datfiles_original_size = len(self.cached_datfiles)
+        while True:
+            while self.batch_queue.qsize() > 100:
+                time.sleep(.100)
 
-        for i in range(self.batch_size):
-            training_id = np.random.choice(len(self.cached_datfiles), 1, replace=False)[0]
-            self.last_batch_datfiles_indexes[i] = training_id
-            dat_file = self.cached_datfiles[training_id]
-            file_id = re.search("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", dat_file).group()
+            while len(self.cached_datfiles) < self.minimum_available_training_set_size or len(self.cached_datfiles) / self.cached_datfiles_original_size < 0.8:
+                time.sleep(.500)
+                self.cached_datfiles = glob.glob(self.training_data_path + "*.dat")
+                self.cached_datfiles_original_size = len(self.cached_datfiles)
 
-            leftEyeImagePath = self.training_data_path + file_id + "_CameraLeftEye.jpg"
-            self._data_x[i] = misc.imread(leftEyeImagePath)
+            labels = np.zeros(shape=(self.batch_size, self.image_height * self.image_width), dtype=np.uint8)
+            data_x = np.zeros(shape=(self.batch_size, self.image_height, self.image_width, self.image_channels), dtype=np.uint8)
 
-            labelsPath = self.training_data_path + file_id + "_labels.dat"
-            self._labels[i] = np.fromfile(labelsPath, dtype=np.uint8, count=self.image_height*self.image_width).reshape((1, self.image_height * self.image_width))
-            # TODO: This is guaranteed to mess up the indexes in self.last_batch_datfiles_indexes. Fix!
-            if random() < self.probability_delete_example:
-                self._delete_training_data(training_id)
+            for i in range(self.batch_size):
+                training_id = np.random.choice(len(self.cached_datfiles), 1, replace=False)[0]
+                dat_file = self.cached_datfiles[training_id]
+                file_id = re.search("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", dat_file).group()
 
+                leftEyeImagePath = self.training_data_path + file_id + "_CameraLeftEye.jpg"
+                data_x[i] = misc.imread(leftEyeImagePath)
 
-        self.cached_semantic_segmentation_data = SemanticSegmentationData(
-            self._data_x,
-            self._labels,
-            self.label_count
-        )
+                labelsPath = self.training_data_path + file_id + "_labels.dat"
+                labels[i] = np.fromfile(labelsPath, dtype=np.uint8, count=self.image_height*self.image_width).reshape((1, self.image_height * self.image_width))
+                # TODO: This is guaranteed to mess up the indexes in self.last_batch_datfiles_indexes. Fix!
+                if random() < self.probability_delete_example:
+                    self._delete_training_data(training_id)
+
+            self.batch_queue.put(SemanticSegmentationData(
+                data_x,
+                labels,
+                self.label_count
+            ))
 
     def _delete_training_data(self, cached_datfile_index):
         dat_file = self.cached_datfiles[cached_datfile_index]
@@ -116,18 +127,11 @@ class SemanticSegmentationTrainingDataLoader:
         self.cached_datfiles = []
 
     def load_next_batch(self, delete_batch_source=False):
-        while self.cached_semantic_segmentation_data == None:
-            time.sleep(.001)
-
-        semantic_segmentation_data = self.cached_semantic_segmentation_data
+        semantic_segmentation_data = self.batch_queue.get(block=True)
         #if delete_batch_source:
             #for dat_index in self.last_batch_datfiles_indexes:
                 # TODO: because of an earlier todo in this file, this needs to be commented out for the time being... Will impact the validation cost calculation slightly, but with 100 000 training data size it should not be so bad.
                 # self._delete_training_data(dat_index)
-
-        self.asynch_load_next_batch_thread = threading.Thread(name='daemon', target=self._asynch_load_next_batch)
-        self.asynch_load_next_batch_thread.setDaemon(True)
-        self.asynch_load_next_batch_thread.start()
 
         return semantic_segmentation_data
 

@@ -1,4 +1,5 @@
 import numpy as np
+import cProfile
 
 from ConvNets.ConvNetMNistSolver.CNNData import CNNData
 from ConvNets.ConvNetMNistSolver.ConvNetMNistSolver import ConvNetMNistSolver
@@ -130,14 +131,17 @@ semantic_segmentation.initialize(
     #0.0001, ==> Slowly decreasing
     #0.03, ==> Slowly increasing
     #0.001, ==> Decreasing
-    0.0001,
+    0.00003,
     batch_size=training_data_generator.batch_size,
-    hyper_param_model_name="BallFinder_02",
-    load_existing_model=False,
+    hyper_param_model_name="BallFinder_03",
+    load_existing_model=True,
     save_model_interval_seconds=120,
     dropout_keep_prob=1.0,
     validation_batch_size=50,
-    validation_every_n_steps=1000)
+    validation_every_n_steps=1000,
+    adaptive_learning_rate_active=False,
+    adaptive_learning_rate=0.05,
+    max_epochs=1000000000)
 
 #for i in range(5000, 5100):
     #picture_data = training_data_generator.load_picture_data("c:/temp/training/" + str(i) +"_CameraLeftEye.jpg")
@@ -150,3 +154,4 @@ semantic_segmentation.initialize(
 #semantic_segmentation.predict_and_create_image("c:/temp/prediction.jpg", picture_data)
 
 semantic_segmentation.train_own_model()
+#cProfile.run('semantic_segmentation.train_own_model()')

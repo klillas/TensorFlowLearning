@@ -41,6 +41,8 @@ class SemanticSegmentation:
     hyper_param_image_channels = None
     hyper_param_label_size = None
     hyper_param_learning_rate = None
+    hyper_param_adaptive_learning_rate_active = None
+    hyper_param_adaptive_learning_rate = None
     hyper_param_train_batch_size = None
     hyper_param_model_name = None
     hyper_param_load_existing_model = None
@@ -49,6 +51,7 @@ class SemanticSegmentation:
     hyper_param_epoch_start = None
     hyper_param_validation_batch_size = None
     hyper_param_validation_every_n_steps = None
+    hyper_param_max_epochs = None
 
     tf_model_saver = None
 
@@ -67,7 +70,10 @@ class SemanticSegmentation:
             save_model_interval_seconds,
             dropout_keep_prob,
             validation_batch_size,
-            validation_every_n_steps):
+            validation_every_n_steps,
+            adaptive_learning_rate_active,
+            adaptive_learning_rate,
+            max_epochs):
         self.data_generator = data_generator
         self.hyper_param_width = image_width
         self.hyper_param_height = image_height
@@ -81,6 +87,9 @@ class SemanticSegmentation:
         self.hyper_param_dropout_keep_prob = dropout_keep_prob
         self.hyper_param_validation_batch_size = validation_batch_size
         self.hyper_param_validation_every_n_steps = validation_every_n_steps
+        self.hyper_param_adaptive_learning_rate_active = adaptive_learning_rate_active
+        self.hyper_param_adaptive_learning_rate = adaptive_learning_rate
+        self.hyper_param_max_epochs = max_epochs
 
         #if load_existing_model == True:
             # Old examples could have been used in training. Delete everything before loading the validation data batch
@@ -149,8 +158,8 @@ class SemanticSegmentation:
         writer_train = tf.summary.FileWriter("./logs/" + self.hyper_param_model_name + "/train", self.session.graph)
         writer_validation = tf.summary.FileWriter("./logs/" + self.hyper_param_model_name + "/validation")
 
-        train_cost_last_print = 0
-        for i in range(self.session.run(self.tf_variable_global_step), 100000000):
+        last_iteration_cost = sys.float_info.max
+        for i in range(self.session.run(self.tf_variable_global_step), self.hyper_param_max_epochs):
             data_train = self.data_generator.load_next_batch()
             if i % 25 == 0:
                 print("Training step {}".format(i))
@@ -158,6 +167,7 @@ class SemanticSegmentation:
             #####Train#####
             #self.exportImageWithLabels("c:/temp/pic.jpg", 0,  np.reshape(self.data_train.labels[0], (self.hyper_param_height, self.hyper_param_width)))
 
+            self.hyper_param_learning_rate
             _ = self.session.run(self.tf_tensor_train, feed_dict={
                 self.tf_ph_x: data_train.data_x,
                 self.tf_ph_labels_one_hot: data_train.labels_one_hot,
@@ -168,9 +178,16 @@ class SemanticSegmentation:
             batch_training_cost = self.session.run(self.tf_tensor_cost, feed_dict={
                 self.tf_ph_x: data_train.data_x,
                 self.tf_ph_labels_one_hot: data_train.labels_one_hot,
-                self.tf_ph_droput_keep_prob: 1.0,
-                self.tf_ph_learning_rate: self.hyper_param_learning_rate
+                self.tf_ph_droput_keep_prob: 1.0
             })
+
+            if self.hyper_param_adaptive_learning_rate_active:
+                if batch_training_cost < last_iteration_cost:
+                    self.hyper_param_learning_rate = self.hyper_param_learning_rate * (1 + self.hyper_param_adaptive_learning_rate)
+                else:
+                    self.hyper_param_learning_rate = self.hyper_param_learning_rate * (1 - self.hyper_param_adaptive_learning_rate)
+                print("New learning rate {0}".format(self.hyper_param_learning_rate))
+                last_iteration_cost = batch_training_cost
 
             costs_summary = tf.Summary()
             costs_summary.value.add(tag="Cost", simple_value=batch_training_cost)
@@ -183,8 +200,6 @@ class SemanticSegmentation:
                 print("")
                 print("#################################################################")
                 print("Train batch cost: {}".format(batch_training_cost))
-                print("Train batch cost delta: {}".format(batch_training_cost - train_cost_last_print))
-                train_cost_last_print = batch_training_cost
                 print("")
                 print("Validation test")
                 self._calculcate_and_log_statistics(
@@ -282,71 +297,6 @@ class SemanticSegmentation:
 
         print("")
 
-
-    def _initialize_predictor(self):
-        if self.hyper_param_load_existing_model == False:
-            self.tf_tensor_predictor = tf.argmax(input=self.tf_tensor_model, axis=2, output_type=tf.int32, name="predictor")
-
-        if self.hyper_param_load_existing_model == True:
-            self.tf_tensor_predictor = self.tf_graph.get_tensor_by_name("predictor:0")
-
-    def _initialize_optimization(self):
-        if self.hyper_param_load_existing_model == False:
-            # Calculate distance from actual labels using cross entropy
-            cross_entropy = tf.nn.softmax_cross_entropy_with_logits(
-                logits=self.tf_tensor_model,
-                labels=self.tf_ph_labels_one_hot)
-            # Take mean for total loss
-            loss_op = tf.reduce_mean(cross_entropy, name="fcn_loss")
-
-            # The model implements this operation to find the weights/parameters that would yield correct pixel labels
-            self.tf_tensor_train = tf.train.AdamOptimizer(learning_rate=self.hyper_param_learning_rate).minimize(loss_op, name="fcn_train_op")
-
-        if self.hyper_param_load_existing_model == True:
-            self.tf_tensor_train = self.tf_graph.get_operation_by_name("fcn_train_op")
-
-    def _model_add_convolution(self, model, filter_multiplier=0, filter_size=0, kernel_size=[3, 3], strides=1):
-        model_filter_size = model.shape[3].value
-        new_filter_size = filter_size
-        if filter_multiplier != 0:
-            new_filter_size = int(model_filter_size * filter_multiplier)
-        model = tf.layers.conv2d(
-            inputs=model,
-            filters=new_filter_size,
-            kernel_size=kernel_size,
-            strides=strides,
-            padding="same",
-            activation=tf.nn.relu
-        )
-        return model
-
-    def _model_add_max_pooling(self, model, pool_size=[2, 2], strides=2):
-        model = tf.layers.max_pooling2d(
-            inputs=model,
-            pool_size=pool_size,
-            strides=strides
-        )
-        return model
-
-    def _model_add_deconvolution(self, model, size_multiplier):
-        model = tf.layers.conv2d_transpose(
-            model,
-            filters=model.shape[3],
-            strides=size_multiplier,
-            kernel_size=(size_multiplier, size_multiplier),
-            padding='same')
-        return model
-
-    def _initialize_test_model(self):
-        model = self._model_add_convolution(model=self.tf_ph_x, filter_size=self.hyper_param_label_size)
-
-        model = tf.reshape(model, (-1, model.shape[1] * model.shape[2], self.hyper_param_label_size), name="fcn_logits")
-
-        self.tf_tensor_model = model
-
-
-
-
     def _initialize_model_U_net(self):
         if self.hyper_param_load_existing_model == False:
             model = tf.nn.dropout(self.tf_ph_x, keep_prob=self.tf_ph_droput_keep_prob)
@@ -355,17 +305,16 @@ class SemanticSegmentation:
             model = self._model_add_convolution(model=model, filter_multiplier=1)
             output_layer1 = model
             model = self._model_add_max_pooling(model=model, pool_size=[4, 4], strides=4)
-            #model = tf.nn.dropout(model, keep_prob=self.tf_ph_droput_keep_prob)
+            # model = tf.nn.dropout(model, keep_prob=self.tf_ph_droput_keep_prob)
 
             model = self._model_add_convolution(model=model, filter_multiplier=2)
             model = self._model_add_convolution(model=model, filter_multiplier=1)
             output_layer2 = model
             model = self._model_add_max_pooling(model=model)
-            #model = tf.nn.dropout(model, keep_prob=self.tf_ph_droput_keep_prob)
+            # model = tf.nn.dropout(model, keep_prob=self.tf_ph_droput_keep_prob)
 
             model = self._model_add_convolution(model=model, filter_multiplier=2)
             model = self._model_add_convolution(model=model, filter_multiplier=1)
-
 
             ###########Deconvolution############
             model = self._model_add_deconvolution(model=model, size_multiplier=2)
@@ -382,7 +331,8 @@ class SemanticSegmentation:
 
             model = self._model_add_convolution(model=model, filter_size=self.hyper_param_label_size)
 
-            model = tf.reshape(model, (-1, model.shape[1] * model.shape[2], self.hyper_param_label_size), name="fcn_logits")
+            model = tf.reshape(model, (-1, model.shape[1] * model.shape[2], self.hyper_param_label_size),
+                               name="fcn_logits")
 
             self.tf_tensor_model = model
 
@@ -566,3 +516,65 @@ class SemanticSegmentation:
         #plt.show()
 
         return img_masked
+
+
+    def _initialize_predictor(self):
+        if self.hyper_param_load_existing_model == False:
+            self.tf_tensor_predictor = tf.argmax(input=self.tf_tensor_model, axis=2, output_type=tf.int32, name="predictor")
+
+        if self.hyper_param_load_existing_model == True:
+            self.tf_tensor_predictor = self.tf_graph.get_tensor_by_name("predictor:0")
+
+    def _initialize_optimization(self):
+        if self.hyper_param_load_existing_model == False:
+            # Calculate distance from actual labels using cross entropy
+            cross_entropy = tf.nn.softmax_cross_entropy_with_logits(
+                logits=self.tf_tensor_model,
+                labels=self.tf_ph_labels_one_hot)
+            # Take mean for total loss
+            loss_op = tf.reduce_mean(cross_entropy, name="fcn_loss")
+
+            # The model implements this operation to find the weights/parameters that would yield correct pixel labels
+            self.tf_tensor_train = tf.train.AdamOptimizer(learning_rate=self.tf_ph_learning_rate).minimize(loss_op, name="fcn_train_op")
+
+        if self.hyper_param_load_existing_model == True:
+            self.tf_tensor_train = self.tf_graph.get_operation_by_name("fcn_train_op")
+
+    def _model_add_convolution(self, model, filter_multiplier=0, filter_size=0, kernel_size=[3, 3], strides=1):
+        model_filter_size = model.shape[3].value
+        new_filter_size = filter_size
+        if filter_multiplier != 0:
+            new_filter_size = int(model_filter_size * filter_multiplier)
+        model = tf.layers.conv2d(
+            inputs=model,
+            filters=new_filter_size,
+            kernel_size=kernel_size,
+            strides=strides,
+            padding="same",
+            activation=tf.nn.relu
+        )
+        return model
+
+    def _model_add_max_pooling(self, model, pool_size=[2, 2], strides=2):
+        model = tf.layers.max_pooling2d(
+            inputs=model,
+            pool_size=pool_size,
+            strides=strides
+        )
+        return model
+
+    def _model_add_deconvolution(self, model, size_multiplier):
+        model = tf.layers.conv2d_transpose(
+            model,
+            filters=model.shape[3],
+            strides=size_multiplier,
+            kernel_size=(size_multiplier, size_multiplier),
+            padding='same')
+        return model
+
+    def _initialize_test_model(self):
+        model = self._model_add_convolution(model=self.tf_ph_x, filter_size=self.hyper_param_label_size)
+
+        model = tf.reshape(model, (-1, model.shape[1] * model.shape[2], self.hyper_param_label_size), name="fcn_logits")
+
+        self.tf_tensor_model = model
