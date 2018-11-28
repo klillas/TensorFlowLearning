@@ -5,11 +5,14 @@ import numpy as np
 from ConvNets.SemanticSegmentation import SemanticSegmentationData, SemanticSegmentationTrainingDataLoader
 from datetime import datetime
 from datetime import timedelta
-from scipy import misc
-from skimage import data, color, io, img_as_float
 import sys
 
 from memory_profiler import profile
+
+from TensorFlowLearning.ConvNets.SemanticSegmentation.SemanticSegmentationDataVisualizer import \
+    SemanticSegmentationDataVisualizer
+from TensorFlowLearning.ConvNets.SemanticSegmentation.SemanticSegmentationModelFactory import \
+    SemanticSegmentationModelFactory
 
 
 class SemanticSegmentation:
@@ -57,6 +60,8 @@ class SemanticSegmentation:
 
     validation_data = None
 
+    semantic_segmentation_data_visualizer = None
+
     def initialize(
             self,
             data_generator: SemanticSegmentationTrainingDataLoader,
@@ -90,6 +95,8 @@ class SemanticSegmentation:
         self.hyper_param_adaptive_learning_rate_active = adaptive_learning_rate_active
         self.hyper_param_adaptive_learning_rate = adaptive_learning_rate
         self.hyper_param_max_epochs = max_epochs
+
+        self.semantic_segmentation_data_visualizer = SemanticSegmentationDataVisualizer()
 
         #if load_existing_model == True:
             # Old examples could have been used in training. Delete everything before loading the validation data batch
@@ -135,8 +142,8 @@ class SemanticSegmentation:
             self.tf_variable_best_cost = [v for v in tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES) if v.name == 'best_cost:0'][0]
             self.tf_ph_learning_rate = self.tf_graph.get_tensor_by_name("learning_rate:0")
 
-        self.tf_summary_image_predictions = tf.summary.image("example prediction", self.tf_variable_image, 50)
-        self.tf_summary_real_image_predictions = tf.summary.image("real world prediction", self.tf_variable_image, self.data_generator.get_real_world_training_examples().shape[0])
+        self.tf_summary_image_predictions = tf.summary.image("example predictions", self.tf_variable_image, 50)
+        self.tf_summary_real_image_predictions = tf.summary.image("real world predictions", self.tf_variable_image, self.data_generator.get_real_world_training_examples().shape[0])
 
         #self._initialize_model_minimal()
         self._initialize_model_U_net()
@@ -223,8 +230,9 @@ class SemanticSegmentation:
             #    )
             #    writer_train.flush()
 
-            if datetime.now() > (time_model_last_saved + timedelta(seconds=self.hyper_param_save_model_interval_seconds)) \
-                    and batch_training_cost < self.session.run(self.tf_variable_best_cost):
+            #if datetime.now() > (time_model_last_saved + timedelta(seconds=self.hyper_param_save_model_interval_seconds)) \
+            #        and batch_training_cost < self.session.run(self.tf_variable_best_cost):
+            if datetime.now() > (time_model_last_saved + timedelta(seconds=self.hyper_param_save_model_interval_seconds)):
                 time_model_last_saved = datetime.now()
                 self.tf_variable_best_cost.load(batch_training_cost, session=self.session)
                 self.tf_model_saver.save(
@@ -270,7 +278,8 @@ class SemanticSegmentation:
                 overlay_image[j:j + self.hyper_param_train_batch_size] = semantic_segmentation_data.data_x
 
             for i in range(50):
-                overlay_image[i] = self._overlay_image_with_labels(overlay_image[i], np.reshape(prediction_batches[i], (self.hyper_param_height, self.hyper_param_width)))
+                #overlay_image[i] = self.semantic_segmentation_data_visualizer.overlay_image_with_labels(overlay_image[i], np.reshape(prediction_batches[i], (self.hyper_param_height, self.hyper_param_width)))
+                overlay_image[i] = self.semantic_segmentation_data_visualizer.generate_ground_truth_image(np.reshape(prediction_batches[i], (self.hyper_param_height, self.hyper_param_width)))
             self.tf_variable_image.load(overlay_image, self.session)
 
             image_summary = self.session.run(self.tf_summary_image_predictions)
@@ -288,7 +297,8 @@ class SemanticSegmentation:
                     self.tf_ph_labels: semantic_segmentation_data.labels,
                     self.tf_ph_droput_keep_prob: 1.0
                 })
-                overlay_image[j] = self._overlay_image_with_labels(real_world_examples[j], np.reshape(image_prediction, (self.hyper_param_height, self.hyper_param_width)))
+                #overlay_image[j] = self.semantic_segmentation_data_visualizer.overlay_image_with_labels(real_world_examples[j], np.reshape(image_prediction, (self.hyper_param_height, self.hyper_param_width)))
+                overlay_image[j] = self.semantic_segmentation_data_visualizer.generate_ground_truth_image(np.reshape(image_prediction, (self.hyper_param_height, self.hyper_param_width)))
 
             self.tf_variable_image.load(overlay_image, self.session)
 
@@ -299,42 +309,8 @@ class SemanticSegmentation:
 
     def _initialize_model_U_net(self):
         if self.hyper_param_load_existing_model == False:
-            model = tf.nn.dropout(self.tf_ph_x, keep_prob=self.tf_ph_droput_keep_prob)
-
-            model = self._model_add_convolution(model=model, filter_size=4)
-            model = self._model_add_convolution(model=model, filter_multiplier=1)
-            output_layer1 = model
-            model = self._model_add_max_pooling(model=model, pool_size=[4, 4], strides=4)
-            # model = tf.nn.dropout(model, keep_prob=self.tf_ph_droput_keep_prob)
-
-            model = self._model_add_convolution(model=model, filter_multiplier=2)
-            model = self._model_add_convolution(model=model, filter_multiplier=1)
-            output_layer2 = model
-            model = self._model_add_max_pooling(model=model)
-            # model = tf.nn.dropout(model, keep_prob=self.tf_ph_droput_keep_prob)
-
-            model = self._model_add_convolution(model=model, filter_multiplier=2)
-            model = self._model_add_convolution(model=model, filter_multiplier=1)
-
-            ###########Deconvolution############
-            model = self._model_add_deconvolution(model=model, size_multiplier=2)
-            model = self._model_add_convolution(model=model, filter_multiplier=0.5)
-            model = tf.concat([model, output_layer2], axis=3)
-            model = self._model_add_convolution(model=model, filter_multiplier=1)
-            model = self._model_add_convolution(model=model, filter_multiplier=0.5)
-
-            model = self._model_add_deconvolution(model=model, size_multiplier=4)
-            model = self._model_add_convolution(model=model, filter_multiplier=0.5)
-            model = tf.concat([model, output_layer1], axis=3)
-            model = self._model_add_convolution(model=model, filter_multiplier=1)
-            model = self._model_add_convolution(model=model, filter_multiplier=0.5)
-
-            model = self._model_add_convolution(model=model, filter_size=self.hyper_param_label_size)
-
-            model = tf.reshape(model, (-1, model.shape[1] * model.shape[2], self.hyper_param_label_size),
-                               name="fcn_logits")
-
-            self.tf_tensor_model = model
+            model_factory = SemanticSegmentationModelFactory()
+            self.tf_tensor_model = model_factory.initialize_model_U_net(self.hyper_param_label_size, self.tf_ph_x, self.tf_ph_droput_keep_prob)
 
         if self.hyper_param_load_existing_model == True:
             self.tf_tensor_model = self.tf_graph.get_tensor_by_name("fcn_logits:0")
@@ -474,50 +450,6 @@ class SemanticSegmentation:
             self.tf_tensor_cost = self.tf_graph.get_tensor_by_name("fcn_loss:0")
 
 
-
-    def predict_and_create_image(self, path, image_data):
-        prediction = self.session.run(self.tf_tensor_predictor, feed_dict={
-            self.tf_ph_x: np.reshape(image_data, (-1, image_data.shape[0], image_data.shape[1], image_data.shape[2])),
-            self.tf_ph_droput_keep_prob: 1.0
-        })
-
-        self._export_image_with_labels(path, image_data, np.reshape(prediction, (self.hyper_param_height, self.hyper_param_width)))
-
-    def _export_image_with_labels(self, path, image_data, predicted_labels):
-        misc.imsave(path, self._overlay_image_with_labels(image_data, predicted_labels))
-
-    def _overlay_image_with_labels(self, image_data, predicted_labels):
-        color_mask = np.zeros((predicted_labels.shape[0], predicted_labels.shape[1], 3))
-        color_mask[np.where(predicted_labels == 1)] = [232, 88, 35]
-        color_mask[np.where(predicted_labels == 2)] = [41, 48, 90]
-        color_mask[np.where(predicted_labels == 3)] = [246, 164, 3]
-        color_mask[np.where(predicted_labels == 4)] = [166, 169, 130]
-        color_mask[np.where(predicted_labels == 5)] = [96, 157, 186]
-
-
-        alpha = 0.8
-        # Convert the input image and color mask to Hue Saturation Value (HSV)
-        # colorspace
-        img_hsv = color.rgb2hsv(image_data)
-        color_mask_hsv = color.rgb2hsv(color_mask)
-
-        # Replace the hue and saturation of the original image
-        # with that of the color mask
-        img_hsv[..., 0] = color_mask_hsv[..., 0]
-        img_hsv[..., 1] = color_mask_hsv[..., 1] * alpha
-
-        img_masked = color.hsv2rgb(img_hsv)
-
-        # Display the output
-        #f, (ax0) = plt.subplots(1, 1, subplot_kw={'xticks': [], 'yticks': []})
-        #ax0.imshow(self.data_x[id], cmap=plt.cm.gray)
-        #ax1.imshow(color_mask)
-        #ax0.imshow(img_masked)
-        #plt.show()
-
-        return img_masked
-
-
     def _initialize_predictor(self):
         if self.hyper_param_load_existing_model == False:
             self.tf_tensor_predictor = tf.argmax(input=self.tf_tensor_model, axis=2, output_type=tf.int32, name="predictor")
@@ -540,41 +472,18 @@ class SemanticSegmentation:
         if self.hyper_param_load_existing_model == True:
             self.tf_tensor_train = self.tf_graph.get_operation_by_name("fcn_train_op")
 
-    def _model_add_convolution(self, model, filter_multiplier=0, filter_size=0, kernel_size=[3, 3], strides=1):
-        model_filter_size = model.shape[3].value
-        new_filter_size = filter_size
-        if filter_multiplier != 0:
-            new_filter_size = int(model_filter_size * filter_multiplier)
-        model = tf.layers.conv2d(
-            inputs=model,
-            filters=new_filter_size,
-            kernel_size=kernel_size,
-            strides=strides,
-            padding="same",
-            activation=tf.nn.relu
-        )
-        return model
-
-    def _model_add_max_pooling(self, model, pool_size=[2, 2], strides=2):
-        model = tf.layers.max_pooling2d(
-            inputs=model,
-            pool_size=pool_size,
-            strides=strides
-        )
-        return model
-
-    def _model_add_deconvolution(self, model, size_multiplier):
-        model = tf.layers.conv2d_transpose(
-            model,
-            filters=model.shape[3],
-            strides=size_multiplier,
-            kernel_size=(size_multiplier, size_multiplier),
-            padding='same')
-        return model
-
     def _initialize_test_model(self):
         model = self._model_add_convolution(model=self.tf_ph_x, filter_size=self.hyper_param_label_size)
 
         model = tf.reshape(model, (-1, model.shape[1] * model.shape[2], self.hyper_param_label_size), name="fcn_logits")
 
         self.tf_tensor_model = model
+
+
+    def predict_and_create_image(self, path, image_data):
+        prediction = self.session.run(self.tf_tensor_predictor, feed_dict={
+            self.tf_ph_x: np.reshape(image_data, (-1, image_data.shape[0], image_data.shape[1], image_data.shape[2])),
+            self.tf_ph_droput_keep_prob: 1.0
+        })
+
+        self.semantic_segmentation_data_visualizer.export_image_with_labels(path, image_data, np.reshape(prediction, (self.hyper_param_height, self.hyper_param_width)))
