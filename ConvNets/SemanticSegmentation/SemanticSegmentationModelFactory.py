@@ -5,23 +5,23 @@ class SemanticSegmentationModelFactory:
     def initialize_model_U_net(self, label_size, tf_ph_x, tf_ph_droput_keep_prob):
         model = tf.nn.dropout(tf_ph_x, keep_prob=tf_ph_droput_keep_prob)
 
-        model = self.add_convolution(model=model, filter_size=4)
+        model = self.add_convolution(model=model, filter_size=64)
         model = self.add_convolution(model=model, filter_multiplier=1)
         output_layer1 = model
         model = self.add_max_pooling(model=model, pool_size=[4, 4], strides=4)
-        # model = tf.nn.dropout(model, keep_prob=self.tf_ph_droput_keep_prob)
+        model = tf.nn.dropout(model, keep_prob=tf_ph_droput_keep_prob)
 
         model = self.add_convolution(model=model, filter_multiplier=2)
         model = self.add_convolution(model=model, filter_multiplier=1)
         output_layer2 = model
-        model = self.add_max_pooling(model=model)
-        # model = tf.nn.dropout(model, keep_prob=self.tf_ph_droput_keep_prob)
+        model = self.add_max_pooling(model=model, pool_size=[4, 4], strides=4)
+        model = tf.nn.dropout(model, keep_prob=tf_ph_droput_keep_prob)
 
         model = self.add_convolution(model=model, filter_multiplier=2)
         model = self.add_convolution(model=model, filter_multiplier=1)
 
         ###########Deconvolution############
-        model = self.add_deconvolution(model=model, size_multiplier=2)
+        model = self.add_deconvolution(model=model, size_multiplier=4)
         model = self.add_convolution(model=model, filter_multiplier=0.5)
         model = tf.concat([model, output_layer2], axis=3)
         model = self.add_convolution(model=model, filter_multiplier=1)
@@ -31,7 +31,11 @@ class SemanticSegmentationModelFactory:
         model = self.add_convolution(model=model, filter_multiplier=0.5)
         model = tf.concat([model, output_layer1], axis=3)
         model = self.add_convolution(model=model, filter_multiplier=1)
-        model = self.add_convolution(model=model, filter_multiplier=0.5)
+        model = self.add_convolution(model=model, filter_multiplier=1)
+
+        model = self.add_convolution(model=model, filter_multiplier=0.25)
+
+        model = self.add_convolution(model=model, filter_multiplier=0.25)
 
         model = self.add_convolution(model=model, filter_size=label_size)
 

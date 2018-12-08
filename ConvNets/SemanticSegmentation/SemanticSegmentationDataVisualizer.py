@@ -32,11 +32,11 @@ class SemanticSegmentationDataVisualizer:
 
     def generate_ground_truth_image(self, predicted_labels):
         ground_truth = np.zeros((predicted_labels.shape[0], predicted_labels.shape[1], 3))
-        ground_truth[np.where(predicted_labels == 0)] = [255, 0, 255]
-        ground_truth[np.where(predicted_labels == 1)] = [232, 88, 35]
-        ground_truth[np.where(predicted_labels == 2)] = [108, 0, 255]
-        ground_truth[np.where(predicted_labels == 3)] = [172, 0, 0]
-        ground_truth[np.where(predicted_labels == 4)] = [72, 165, 0]
-        ground_truth[np.where(predicted_labels == 5)] = [72, 92, 135]
+        ground_truth[np.where(predicted_labels == 0)] = [128, 128, 128]
+        ground_truth[np.where(predicted_labels == 1)] = [128, 0, 0]
+        ground_truth[np.where(predicted_labels == 2)] = [128, 128, 0]
+        ground_truth[np.where(predicted_labels == 3)] = [0, 0, 192]
+        ground_truth[np.where(predicted_labels == 4)] = [128, 64, 128]
+        ground_truth[np.where(predicted_labels == 5)] = [64, 0, 128]
 
         return ground_truth

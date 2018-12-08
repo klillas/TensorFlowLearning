@@ -143,7 +143,7 @@ class SemanticSegmentation:
             self.tf_ph_learning_rate = self.tf_graph.get_tensor_by_name("learning_rate:0")
 
         self.tf_summary_image_predictions = tf.summary.image("example predictions", self.tf_variable_image, 50)
-        self.tf_summary_real_image_predictions = tf.summary.image("real world predictions", self.tf_variable_image, self.data_generator.get_real_world_training_examples().shape[0])
+        self.tf_summary_real_image_predictions = tf.summary.image("real world predictions", self.tf_variable_image, self.data_generator.get_real_world_training_examples().shape[0]*2)
 
         #self._initialize_model_minimal()
         self._initialize_model_U_net()
@@ -291,14 +291,16 @@ class SemanticSegmentation:
             # TODO: This only works if the batch size is equal to 50 or evenly divisible, so have to fix that
             real_world_examples = self.data_generator.get_real_world_training_examples()
             overlay_image = np.zeros((50, self.hyper_param_height, self.hyper_param_width, self.hyper_param_image_channels))
-            for j in range(real_world_examples.shape[0]):
+            for j in range(0, real_world_examples.shape[0] * 2, 2):
                 image_prediction = self.session.run(self.tf_tensor_predictor, feed_dict={
-                    self.tf_ph_x: np.reshape(real_world_examples[j], (1, self.hyper_param_height, self.hyper_param_width, self.hyper_param_image_channels)),
+                    self.tf_ph_x: np.reshape(real_world_examples[int(j/2)], (1, self.hyper_param_height, self.hyper_param_width, self.hyper_param_image_channels)),
                     self.tf_ph_labels: semantic_segmentation_data.labels,
                     self.tf_ph_droput_keep_prob: 1.0
                 })
-                #overlay_image[j] = self.semantic_segmentation_data_visualizer.overlay_image_with_labels(real_world_examples[j], np.reshape(image_prediction, (self.hyper_param_height, self.hyper_param_width)))
                 overlay_image[j] = self.semantic_segmentation_data_visualizer.generate_ground_truth_image(np.reshape(image_prediction, (self.hyper_param_height, self.hyper_param_width)))
+                overlay_image[j+1] = self.semantic_segmentation_data_visualizer.overlay_image_with_labels(
+                    real_world_examples[int(j/2)],
+                    np.reshape(image_prediction, (self.hyper_param_height, self.hyper_param_width)))
 
             self.tf_variable_image.load(overlay_image, self.session)
 
