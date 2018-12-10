@@ -266,6 +266,7 @@ public class GenerateTrainingData : MonoBehaviour {
             }
 
             GenerateSemanticSegmentationTableObjectBoundaries(guid);
+            //GenerateSemanticSegmentationTableCompleteObject(guid);
 
             examplesGenerated++;
 
@@ -456,11 +457,19 @@ public class GenerateTrainingData : MonoBehaviour {
             RaycastHit hit;
             Physics.Raycast(ray, out hit);
 
+            if (hit.collider == null)
+            {
+               return true;
+            }
+
             if (hit.collider != null)
             {
                int hashCode = hit.collider.gameObject.GetHashCode();
-               if (labelledItems.ContainsKey(hashCode)
-                  && labelledItems[hashCode].label != pixelLabel)
+               if (!labelledItems.ContainsKey(hashCode))
+               {
+                  return true;
+               }
+               else if (labelledItems[hashCode].label != pixelLabel)
                {
                   return true;
                }

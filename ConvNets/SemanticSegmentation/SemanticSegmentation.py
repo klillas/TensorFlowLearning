@@ -291,7 +291,7 @@ class SemanticSegmentation:
 
             for i in range(0, 50, 2):
                 overlay_image[i] = self.semantic_segmentation_data_visualizer.generate_ground_truth_image(np.reshape(ground_truth_batches[i], (self.hyper_param_height, self.hyper_param_width)))
-                overlay_image[i+1] = self.semantic_segmentation_data_visualizer.overlay_image_with_labels(image_batches[i+1], np.reshape(ground_truth_batches[i+1], (self.hyper_param_height, self.hyper_param_width)))
+                overlay_image[i+1] = self.semantic_segmentation_data_visualizer.overlay_image_with_labels(image_batches[i], np.reshape(ground_truth_batches[i], (self.hyper_param_height, self.hyper_param_width)))
             self.tf_variable_image.load(overlay_image, self.session)
 
             image_summary = self.session.run(self.tf_summary_image_base_truth)
