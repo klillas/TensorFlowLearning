@@ -34,7 +34,7 @@ public class GenerateTrainingData : MonoBehaviour {
    private GameObject[] Prefabs;
    private GameObject BackWall;
    private GameObject Floor;
-   string trainingFolderLocation = "g:/temp/training/";
+   string trainingFolderLocation = "c:/temp/training/";
    List<GameObject> visibleItems = new List<GameObject>();
    Dictionary<int, LabelledItem> labelledItems;
    System.Random rand = new System.Random();
@@ -265,7 +265,7 @@ public class GenerateTrainingData : MonoBehaviour {
                TakeScreenshot(camera, guid);
             }
 
-            GenerateSemanticSegmentationTable(guid);
+            GenerateSemanticSegmentationTableObjectBoundaries(guid);
 
             examplesGenerated++;
 
@@ -375,7 +375,103 @@ public class GenerateTrainingData : MonoBehaviour {
       BackWall.transform.position = new Vector3(0, 0, (float)zPos);
    }
 
-   private void GenerateSemanticSegmentationTable(Guid id)
+   private void GenerateSemanticSegmentationTableObjectBoundaries(Guid id)
+   {
+      var startTime = DateTime.Now;
+      // Generate semantic segmentation table
+      int width = Camera.allCameras[0].pixelWidth;
+      int height = Camera.allCameras[0].pixelHeight;
+      byte[] semanticSegmentationTable = new byte[width * height];
+      byte label0 = Convert.ToByte('0');
+      byte label1 = Convert.ToByte('1');
+      byte deliminator = Convert.ToByte(' ');
+      int arrPos = 0;
+      for (int row = height - 1; row >= 0; row--)
+      {
+         for (int column = 0; column < width; column++)
+         {
+            Ray ray = Camera.allCameras[0].ScreenPointToRay(new Vector3(column, row, 0));
+            RaycastHit hit;
+            Physics.Raycast(ray, out hit);
+
+            if (hit.collider == null)
+            {
+               semanticSegmentationTable[arrPos] = 0;
+            }
+            else
+            {
+               int hashCode = hit.collider.gameObject.GetHashCode();
+               if (labelledItems.ContainsKey(hashCode) && IsBoundaryPixel(row, column, labelledItems[hashCode].label))
+               {
+                  semanticSegmentationTable[arrPos] = (byte)labelledItems[hashCode].label;
+               }
+               else
+               {
+                  // TODO: This needs to be changed to 0xFF after the loss function is updated to disregard 0xFF
+                  semanticSegmentationTable[arrPos] = 0;
+               }
+            }
+            arrPos += 1;
+         }
+      }
+      this.labelCreationTime += DateTime.Now - startTime;
+
+      startTime = DateTime.Now;
+      File.WriteAllBytes(trainingFolderLocation + "/" + id + "_labels.xxx", semanticSegmentationTable);
+      File.Move(trainingFolderLocation + "/" + id + "_labels.xxx", trainingFolderLocation + "/" + id + "_labels.dat");
+      this.fileSavingTime += DateTime.Now - startTime;
+   }
+
+   /// <summary>
+   /// Checks the surrounding area to see if this is a boundary object pixel or not
+   /// </summary>
+   private bool IsBoundaryPixel(int rowPos, int columnPos, int pixelLabel)
+   {
+      int width = Camera.allCameras[0].pixelWidth;
+      int height = Camera.allCameras[0].pixelHeight;
+      int searchSize = 4;
+      for (int row = rowPos - (searchSize / 2); row < rowPos + (searchSize / 2); row++)
+      {
+         if (row < 0)
+         {
+            row = 0;
+         }
+         else if (row >= height)
+         {
+            continue;
+         }
+         for (int column = columnPos - (searchSize / 2); column < columnPos + (searchSize / 2); column++)
+         {
+            if (column < 0)
+            {
+               column = 0;
+            }
+            else if (column >= width)
+            {
+               continue;
+            }
+
+            // Enough if we find a single pixel with a different label than the rowPos, columnPos pixel
+            Ray ray = Camera.allCameras[0].ScreenPointToRay(new Vector3(column, row, 0));
+            RaycastHit hit;
+            Physics.Raycast(ray, out hit);
+
+            if (hit.collider != null)
+            {
+               int hashCode = hit.collider.gameObject.GetHashCode();
+               if (labelledItems.ContainsKey(hashCode)
+                  && labelledItems[hashCode].label != pixelLabel)
+               {
+                  return true;
+               }
+            }
+         }
+      }
+
+      return false;
+   }
+
+   private void GenerateSemanticSegmentationTableCompleteObject(Guid id)
    {
       var startTime = DateTime.Now;
       // Generate semantic segmentation table

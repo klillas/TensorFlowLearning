@@ -34,6 +34,7 @@ class SemanticSegmentation:
     tf_variable_best_cost = None
 
     tf_summary_image_predictions = None
+    tf_summary_image_base_truth = None
     tf_summary_real_image_predictions = None
 
     tf_session = None
@@ -143,6 +144,7 @@ class SemanticSegmentation:
             self.tf_ph_learning_rate = self.tf_graph.get_tensor_by_name("learning_rate:0")
 
         self.tf_summary_image_predictions = tf.summary.image("example predictions", self.tf_variable_image, 50)
+        self.tf_summary_image_base_truth = tf.summary.image("example base truth", self.tf_variable_image, 50)
         self.tf_summary_real_image_predictions = tf.summary.image("real world predictions", self.tf_variable_image, self.data_generator.get_real_world_training_examples().shape[0]*2)
 
         #self._initialize_model_minimal()
@@ -267,7 +269,9 @@ class SemanticSegmentation:
             # TODO: Make the amount of predictions user definable (All the static 50 assignments here and in the initializer
             # TODO: This only works if the batch size is equal to 50 or evenly divisible, so have to fix that
             prediction_batches = np.zeros((50, self.hyper_param_height * self.hyper_param_width))
+            image_batches = np.zeros((50, self.hyper_param_height, self.hyper_param_width, self.hyper_param_image_channels))
             overlay_image = np.zeros((50, self.hyper_param_height, self.hyper_param_width, self.hyper_param_image_channels))
+            ground_truth_batches = np.zeros((50, self.hyper_param_height * self.hyper_param_width))
             for j in range(50)[0::self.hyper_param_train_batch_size]:
                 semantic_segmentation_data = self.data_generator.load_next_batch(delete_batch_source=True)
                 batch_predictor = self.session.run(self.tf_tensor_predictor, feed_dict={
@@ -275,16 +279,23 @@ class SemanticSegmentation:
                     self.tf_ph_droput_keep_prob: 1.0
                 })
                 prediction_batches[j:j + self.hyper_param_train_batch_size] = batch_predictor
-                overlay_image[j:j + self.hyper_param_train_batch_size] = semantic_segmentation_data.data_x
+                image_batches[j:j + self.hyper_param_train_batch_size] = semantic_segmentation_data.data_x
+                ground_truth_batches[j:j + self.hyper_param_train_batch_size] = semantic_segmentation_data.labels
 
             for i in range(50):
-                #overlay_image[i] = self.semantic_segmentation_data_visualizer.overlay_image_with_labels(overlay_image[i], np.reshape(prediction_batches[i], (self.hyper_param_height, self.hyper_param_width)))
                 overlay_image[i] = self.semantic_segmentation_data_visualizer.generate_ground_truth_image(np.reshape(prediction_batches[i], (self.hyper_param_height, self.hyper_param_width)))
             self.tf_variable_image.load(overlay_image, self.session)
 
             image_summary = self.session.run(self.tf_summary_image_predictions)
             summary_writer.add_summary(image_summary, tf.train.global_step(self.session, self.tf_variable_global_step))
 
+            for i in range(0, 50, 2):
+                overlay_image[i] = self.semantic_segmentation_data_visualizer.generate_ground_truth_image(np.reshape(ground_truth_batches[i], (self.hyper_param_height, self.hyper_param_width)))
+                overlay_image[i+1] = self.semantic_segmentation_data_visualizer.overlay_image_with_labels(image_batches[i+1], np.reshape(ground_truth_batches[i+1], (self.hyper_param_height, self.hyper_param_width)))
+            self.tf_variable_image.load(overlay_image, self.session)
+
+            image_summary = self.session.run(self.tf_summary_image_base_truth)
+            summary_writer.add_summary(image_summary, tf.train.global_step(self.session, self.tf_variable_global_step))
 
 
             # TODO: Make the amount of predictions user definable (All the static 50 assignments here and in the initializer

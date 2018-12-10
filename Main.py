@@ -133,8 +133,8 @@ semantic_segmentation.initialize(
     #0.001, ==> Decreasing
     0.00003,
     batch_size=training_data_generator.batch_size,
-    hyper_param_model_name="BallFinder_12",
-    load_existing_model=True,
+    hyper_param_model_name="BallFinder_Boundary_01",
+    load_existing_model=False,
     save_model_interval_seconds=300,
     dropout_keep_prob=0.98,
     validation_batch_size=50,
