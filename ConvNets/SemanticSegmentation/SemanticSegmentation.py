@@ -99,6 +99,8 @@ class SemanticSegmentation:
 
         self.semantic_segmentation_data_visualizer = SemanticSegmentationDataVisualizer()
 
+        model_factory = SemanticSegmentationModelFactory()
+
         #if load_existing_model == True:
             # Old examples could have been used in training. Delete everything before loading the validation data batch
             # TODO: Refactor this to be a setting, because you do not always want to delete all examples even when loading an existing model
@@ -150,7 +152,11 @@ class SemanticSegmentation:
         #self._initialize_model_minimal()
         self._initialize_model_U_net()
         #self._initialize_test_model()
-        self._initialize_cost()
+        self.tf_tensor_cost = model_factory.initialize_cost(
+            load_existing_model=self.hyper_param_load_existing_model,
+            model=self.tf_tensor_model,
+            labels_one_hot=self.tf_ph_labels_one_hot,
+            graph=self.tf_graph)
         self._initialize_optimization()
         self._initialize_predictor()
 
@@ -329,140 +335,6 @@ class SemanticSegmentation:
             self.tf_tensor_model = self.tf_graph.get_tensor_by_name("fcn_logits:0")
 
 
-    def _initialize_model_minimal(self):
-        if self.hyper_param_load_existing_model == False:
-            model = tf.layers.conv2d(
-                inputs=self.tf_ph_x,
-                filters=64,
-                kernel_size=[3, 3],
-                strides=1,
-                padding="same",
-                activation=tf.nn.relu
-            )
-
-            model = tf.layers.conv2d(
-                inputs=model,
-                filters=64,
-                kernel_size=[3, 3],
-                strides=1,
-                padding="same",
-                activation=tf.nn.relu
-            )
-
-            model = tf.layers.max_pooling2d(
-                inputs=model,
-                pool_size=[2, 2],
-                strides=2
-            )
-
-            model = tf.layers.conv2d(
-                inputs=model,
-                filters=128,
-                kernel_size=[3, 3],
-                strides=1,
-                padding="same",
-                activation=tf.nn.relu
-            )
-
-            model = tf.layers.conv2d(
-                inputs=model,
-                filters=128,
-                kernel_size=[3, 3],
-                strides=1,
-                padding="same",
-                activation=tf.nn.relu
-            )
-
-            model = tf.layers.max_pooling2d(
-                inputs=model,
-                pool_size=[2, 2],
-                strides=2
-            )
-
-            model = tf.layers.conv2d(
-                inputs=model,
-                filters=256,
-                kernel_size=[3, 3],
-                strides=1,
-                padding="same",
-                activation=tf.nn.relu
-            )
-
-            model = tf.layers.conv2d(
-                inputs=model,
-                filters=256,
-                kernel_size=[3, 3],
-                strides=1,
-                padding="same",
-                activation=tf.nn.relu
-            )
-
-            model = tf.layers.max_pooling2d(
-                inputs=model,
-                pool_size=[3, 3],
-                strides=3
-            )
-
-            model = tf.reshape(
-                model,
-                (-1, model.shape[1] * model.shape[2] * model.shape[3]))
-
-            #model = tf.concat([model, model_conv1_lowres_flat, model_conv2_lowres_flat], axis=1)
-
-            #model = tf.nn.dropout(
-            #    model,
-            #    keep_prob=self.tf_ph_droput_keep_prob
-            #)
-
-            model = tf.layers.dense(
-                inputs=model,
-                units=1024
-            )
-
-            #model = tf.nn.dropout(
-            #    model,
-            #    keep_prob=self.tf_ph_droput_keep_prob
-            #)
-
-            model = tf.layers.dense(
-                inputs=model,
-                units=48*64,
-                name="Dense2"
-            )
-
-            model = tf.reshape(
-                model,
-                (-1, 48, 64, 1))
-
-            model = tf.layers.conv2d_transpose(
-                model,
-                filters=self.hyper_param_label_size,
-                kernel_size=64,
-                strides=((int)(self.hyper_param_height / model.shape[1].value), (int)(self.hyper_param_width / model.shape[2].value)),
-                padding='SAME')
-
-            model = tf.reshape(
-                model,
-                (-1, model.shape[1] * model.shape[2], model.shape[3]),
-                name="fcn_logits")
-
-            self.tf_tensor_model = model
-
-        if self.hyper_param_load_existing_model == True:
-            self.tf_tensor_model = self.tf_graph.get_tensor_by_name("fcn_logits:0")
-
-
-    def _initialize_cost(self):
-        if self.hyper_param_load_existing_model == False:
-            # Calculate distance from actual labels using cross entropy
-            cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=self.tf_tensor_model, labels=self.tf_ph_labels_one_hot, name="cross_entropy")
-            # Take mean for total loss
-            self.tf_tensor_cost = tf.reduce_mean(cross_entropy, name="fcn_loss")
-
-        if self.hyper_param_load_existing_model == True:
-            self.tf_tensor_cost = self.tf_graph.get_tensor_by_name("fcn_loss:0")
-
-
     def _initialize_predictor(self):
         if self.hyper_param_load_existing_model == False:
             self.tf_tensor_predictor = tf.argmax(input=self.tf_tensor_model, axis=2, output_type=tf.int32, name="predictor")
@@ -484,13 +356,6 @@ class SemanticSegmentation:
 
         if self.hyper_param_load_existing_model == True:
             self.tf_tensor_train = self.tf_graph.get_operation_by_name("fcn_train_op")
-
-    def _initialize_test_model(self):
-        model = self._model_add_convolution(model=self.tf_ph_x, filter_size=self.hyper_param_label_size)
-
-        model = tf.reshape(model, (-1, model.shape[1] * model.shape[2], self.hyper_param_label_size), name="fcn_logits")
-
-        self.tf_tensor_model = model
 
 
     def predict_and_create_image(self, path, image_data):

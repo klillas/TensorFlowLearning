@@ -402,13 +402,19 @@ public class GenerateTrainingData : MonoBehaviour {
             else
             {
                int hashCode = hit.collider.gameObject.GetHashCode();
-               if (labelledItems.ContainsKey(hashCode) && IsBoundaryPixel(row, column, labelledItems[hashCode].label))
+               if (labelledItems.ContainsKey(hashCode))
                {
-                  semanticSegmentationTable[arrPos] = (byte)labelledItems[hashCode].label;
+                  if (IsBoundaryPixel(row, column, labelledItems[hashCode].label))
+                  {
+                     semanticSegmentationTable[arrPos] = (byte)labelledItems[hashCode].label;
+                  }
+                  else
+                  {
+                     semanticSegmentationTable[arrPos] = 0xFF;
+                  }
                }
                else
                {
-                  // TODO: This needs to be changed to 0xFF after the loss function is updated to disregard 0xFF
                   semanticSegmentationTable[arrPos] = 0;
                }
             }
