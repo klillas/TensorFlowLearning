@@ -107,8 +107,10 @@ class SemanticSegmentationTrainingDataLoader:
 
         labelsPath = self.training_data_path + file_id + "_labels.dat"
 
-        os.remove(leftEyeImagePath)
-        os.remove(labelsPath)
+        if os.path.exists(leftEyeImagePath):
+            os.remove(leftEyeImagePath)
+        if os.path.exists(labelsPath):
+            os.remove(labelsPath)
         self.cached_datfiles.pop(cached_datfile_index)
 
     def delete_all_existing_training_data(self):

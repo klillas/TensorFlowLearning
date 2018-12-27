@@ -9,11 +9,12 @@ class SemanticSegmentationDataVisualizer:
 
     def overlay_image_with_labels(self, image_data, predicted_labels):
         color_mask = np.zeros((predicted_labels.shape[0], predicted_labels.shape[1], 3))
-        color_mask[np.where(predicted_labels == 1)] = [232, 88, 35]
-        color_mask[np.where(predicted_labels == 2)] = [41, 48, 90]
-        color_mask[np.where(predicted_labels == 3)] = [246, 164, 3]
-        color_mask[np.where(predicted_labels == 4)] = [166, 169, 130]
-        color_mask[np.where(predicted_labels == 5)] = [96, 157, 186]
+        color_mask[np.where(predicted_labels == 0)] = [128, 128, 128]
+        color_mask[np.where(predicted_labels == 1)] = [128, 0, 0]
+        color_mask[np.where(predicted_labels == 2)] = [128, 128, 0]
+        color_mask[np.where(predicted_labels == 3)] = [0, 0, 192]
+        color_mask[np.where(predicted_labels == 4)] = [128, 64, 128]
+        color_mask[np.where(predicted_labels == 5)] = [64, 0, 128]
 
 
         alpha = 0.8

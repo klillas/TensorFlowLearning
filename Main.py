@@ -119,8 +119,8 @@ print("Loading training data")
 training_data_generator = SemanticSegmentationTrainingDataLoader()
 training_data_generator.initialize(
     batch_size=5,
-    probability_delete_example=0.0,
-    minimum_available_training_set_size=1)
+    probability_delete_example=1.0,
+    minimum_available_training_set_size=500)
 
 semantic_segmentation = SemanticSegmentation()
 semantic_segmentation.initialize(
@@ -133,7 +133,7 @@ semantic_segmentation.initialize(
     #0.001, ==> Decreasing
     0.00003,
     batch_size=training_data_generator.batch_size,
-    hyper_param_model_name="BallFinder_Boundary_11",
+    hyper_param_model_name="BallFinder_Boundary_17",
     load_existing_model=True,
     save_model_interval_seconds=300,
     dropout_keep_prob=0.98,

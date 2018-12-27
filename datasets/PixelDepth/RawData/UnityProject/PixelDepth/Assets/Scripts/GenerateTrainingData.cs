@@ -404,7 +404,12 @@ public class GenerateTrainingData : MonoBehaviour {
                int hashCode = hit.collider.gameObject.GetHashCode();
                if (labelledItems.ContainsKey(hashCode))
                {
-                  if (IsBoundaryPixel(row, column, labelledItems[hashCode].label))
+                  if (labelledItems[hashCode].label == 0)
+                  {
+                     // 0 is background items. Just there for interference.
+                     semanticSegmentationTable[arrPos] = 0;
+                  }
+                  else if (IsBoundaryPixel(row, column, labelledItems[hashCode]))
                   {
                      semanticSegmentationTable[arrPos] = (byte)labelledItems[hashCode].label;
                   }
@@ -432,7 +437,7 @@ public class GenerateTrainingData : MonoBehaviour {
    /// <summary>
    /// Checks the surrounding area to see if this is a boundary object pixel or not
    /// </summary>
-   private bool IsBoundaryPixel(int rowPos, int columnPos, int pixelLabel)
+   private bool IsBoundaryPixel(int rowPos, int columnPos, LabelledItem labelledItem)
    {
       int width = Camera.allCameras[0].pixelWidth;
       int height = Camera.allCameras[0].pixelHeight;
@@ -471,11 +476,7 @@ public class GenerateTrainingData : MonoBehaviour {
             if (hit.collider != null)
             {
                int hashCode = hit.collider.gameObject.GetHashCode();
-               if (!labelledItems.ContainsKey(hashCode))
-               {
-                  return true;
-               }
-               else if (labelledItems[hashCode].label != pixelLabel)
+               if (!labelledItems.ContainsKey(hashCode) || labelledItems[hashCode] != labelledItem)
                {
                   return true;
                }
